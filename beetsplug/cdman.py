@@ -1,3 +1,5 @@
+import shutil
+import os
 from beets.plugins import BeetsPlugin
 from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
@@ -47,6 +49,12 @@ class CD:
                 folders += ", "
         return f"{self.path}: [{folders}]"
 
+    def has_folder(self, dirname: str) -> bool:
+        for folder in self.folders:
+            if folder.dirname == dirname:
+                return True
+        return False
+
 
 class CDManPlugin(BeetsPlugin):
     def __init__(self, name: str | None = None):
@@ -71,33 +79,60 @@ class CDManPlugin(BeetsPlugin):
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
         cds = self._load_cds()
         
-        # TODO: Need to go through main CD folder and see if any existing folders aren't in the list anymore
-        # Possibly rename folders?
         with ThreadPoolExecutor(max_workers=self.config["threads"].get()) as executor:
             for cd in cds:
+                # Find removed folders
+                if cd.path.exists():
+                    for existing_path in cd.path.iterdir():
+                        if not existing_path.is_dir():
+                            continue
+                        if cd.has_folder(existing_path.name):
+                            continue
+                        print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
+                        executor.submit(shutil.rmtree, existing_path)
+
+                # Convert
                 for i, folder in enumerate(cd.folders):
                     query, _ = parse_query_string(folder.query, Item)
-                    items = lib.items(query)
                     folder_path = folder.get_path(i, cd.path, len(cd.folders))
                     folder_path.mkdir(parents=True, exist_ok=True)
-                    for item in items:
-                        converted_path = folder_path / (item.filepath.stem + ".mp3")
-                        if converted_path.exists():
-                            if converted_path.is_file() or converted_path.is_symlink():
-                                print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
-                                continue
-                            else:
-                                print(f"FATAL: {converted_path} already exists, but it isn't a file!")
-                                print("Unsure how to proceed, you should probably manually intervene here.")
-                                exit(1)
+                    items = lib.items(query)
+                    self._clean_folder(items, folder_path, executor)
+                    self._convert_folder(items, folder_path, executor)
+        return None
 
-                        def job(src_file: Path, dest_file: Path):
-                            print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
-                            self._convert_file(src_file, dest_file)
+    def _clean_folder(items: list[Item], folder_path: Path, executor: ThreadPoolExecutor):
+        converted_paths: list[Path] = []
+        for item in items:
+            converted_paths.append(folder_path / (item.filepath.stem + ".mp3"))
 
-                        executor.submit(job, item.filepath, converted_path)
+        for path in folder_path.iterdir():
+            if path.suffix != ".mp3":
+                continue
+            if not path.is_file() and not path.is_symlink():
+                continue
 
-        
+            if path not in converted_paths:
+                print(f"Found removed file `{path}` in folder `{folder_path}`. This file will be removed.")
+                executor.submit(os.remove, path)
+
+    def _convert_folder(self, items: list[Item], folder_path: Path, executor: ThreadPoolExecutor):
+        for item in items:
+            converted_path = folder_path / (item.filepath.stem + ".mp3")
+            if converted_path.exists():
+                if converted_path.is_file() or converted_path.is_symlink():
+                    print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
+                    continue
+                else:
+                    print(f"FATAL: {converted_path} already exists, but it isn't a file!")
+                    print("Unsure how to proceed, you should probably manually intervene here.")
+                    exit(1)
+
+            def job(src_file: Path, dest_file: Path):
+                print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
+                self._convert_file(src_file, dest_file)
+
+            executor.submit(job, item.filepath, converted_path)
         return None
 
     def _convert_file(self, file: Path, dest_file: Path):
