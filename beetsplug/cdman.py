@@ -101,7 +101,7 @@ class CDManPlugin(BeetsPlugin):
                     self._convert_folder(items, folder_path, executor)
         return None
 
-    def _clean_folder(items: list[Item], folder_path: Path, executor: ThreadPoolExecutor):
+    def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
         converted_paths: list[Path] = []
         for item in items:
             converted_paths.append(folder_path / (item.filepath.stem + ".mp3"))
@@ -116,7 +116,7 @@ class CDManPlugin(BeetsPlugin):
                 print(f"Found removed file `{path}` in folder `{folder_path}`. This file will be removed.")
                 executor.submit(os.remove, path)
 
-    def _convert_folder(self, items: list[Item], folder_path: Path, executor: ThreadPoolExecutor):
+    def _convert_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
         for item in items:
             converted_path = folder_path / (item.filepath.stem + ".mp3")
             if converted_path.exists():
@@ -153,8 +153,8 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _load_cds(self) -> list[CD]:
-        cds_path = Path(self.config["cds_path"].get())
-        conf_cds = self.config["cds"].get()
+        cds_path = Path(self.config["cds_path"].get(str)) # pyright: ignore[reportArgumentType]
+        conf_cds: dict = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
         cd_names = conf_cds.keys()
 
         cds: list[CD] = []
