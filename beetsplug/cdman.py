@@ -1,3 +1,8 @@
+import shutil
+import os
+import re
+import psutil
+from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
 from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
@@ -47,15 +52,61 @@ class CD:
                 folders += ", "
         return f"{self.path}: [{folders}]"
 
+    def find_folder_path(self, dirname: str) -> Optional[Path]:
+        """
+        Extracts the path of the folder from the given dirname,
+        and then returns the current dirname of that folder.
+        Example: "05 Lemaitre" would return "07 Lemaitre" if Lemaitre was moved to position 7.
+        It could return None if Lemaitre is not in this CD.
+        """
+        # First we need to extract the actual name from the given directory name
+        # Currently dirname is expected to be in the example format of "09 Folder"
+        name_regex = r"^\d+\s+(.*$)"
+        name_match = re.match(name_regex, dirname)
+        if name_match is None:
+            # dirname isn't in the expected format
+            return None
+
+        # Ignore the numbers, the capture group should be everything after
+        # the folder's position
+        folder_name = name_match.group(1)
+        if type(folder_name) != str:
+            # Something went wrong, maybe nothing was captured?
+            return None
+
+        # We now have the name of the folder,
+        # let's see if it's even in this CD
+        folder_idx = self.find_folder(folder_name)
+        if folder_idx == -1:
+            # Folder is not in CD
+            return None
+        folder = self.folders[folder_idx]
+        
+        # Folder is in CD, retrieve the path and return it
+        return folder.get_path(folder_idx, self.path, len(self.folders))
+
+    def has_folder(self, dirname: str) -> bool:
+        return self.find_folder(dirname) != -1
+
+    def find_folder(self, dirname: str) -> int:
+        """
+        Gets the index of the folder provided
+        """
+        for i, folder in enumerate(self.folders):
+            if folder.dirname == dirname:
+                return i
+        return -1
+
 
 class CDManPlugin(BeetsPlugin):
     def __init__(self, name: str | None = None):
         super().__init__(name)
         self.bitrate = self.config["bitrate"].get()
+        hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
             "bitrate": 128,
             "cds": [],
-            "threads": 8,
+            "threads": hw_thread_count,
         })
 
     def commands(self):
@@ -71,36 +122,70 @@ class CDManPlugin(BeetsPlugin):
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
         cds = self._load_cds()
         
-        # TODO: Need to go through main CD folder and see if any existing folders aren't in the list anymore
-        # Possibly rename folders?
-        with ThreadPoolExecutor(max_workers=self.config["threads"].get()) as executor:
+        max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
+        with ThreadPoolExecutor(max_workers) as executor:
             for cd in cds:
+                # Find removed or reordered folders
+                if cd.path.exists():
+                    for existing_path in cd.path.iterdir():
+                        if not existing_path.is_dir():
+                            continue
+                        new_path = cd.find_folder_path(existing_path.name)
+                        if new_path == existing_path:
+                            continue
+                        if new_path is None:
+                            print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
+                            executor.submit(shutil.rmtree, existing_path)
+                        else:
+                            print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
+                            executor.submit(os.rename, existing_path, new_path)
+
+                # Convert
                 for i, folder in enumerate(cd.folders):
                     query, _ = parse_query_string(folder.query, Item)
-                    items = lib.items(query)
                     folder_path = folder.get_path(i, cd.path, len(cd.folders))
                     folder_path.mkdir(parents=True, exist_ok=True)
-                    for item in items:
-                        converted_path = folder_path / (item.filepath.stem + ".mp3")
-                        if converted_path.exists():
-                            if converted_path.is_file() or converted_path.is_symlink():
-                                print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
-                                continue
-                            else:
-                                print(f"FATAL: {converted_path} already exists, but it isn't a file!")
-                                print("Unsure how to proceed, you should probably manually intervene here.")
-                                exit(1)
+                    items = lib.items(query)
+                    self._clean_folder(items, folder_path, executor)
+                    self._convert_folder(items, folder_path, executor)
+        return None
 
-                        def job(src_file: Path, dest_file: Path):
-                            print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
-                            self._convert_file(src_file, dest_file)
+    def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
+        converted_paths: list[Path] = []
+        for item in items:
+            converted_paths.append(folder_path / (item.filepath.stem + ".mp3"))
 
-                        executor.submit(job, item.filepath, converted_path)
+        for path in folder_path.iterdir():
+            if path.suffix != ".mp3":
+                continue
+            if not path.is_file() and not path.is_symlink():
+                continue
 
-        
+            if path not in converted_paths:
+                print(f"Found removed file `{path}` in folder `{folder_path}`. This file will be removed.")
+                executor.submit(os.remove, path)
+
+    def _convert_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
+        for item in items:
+            converted_path = folder_path / (item.filepath.stem + ".mp3")
+            if converted_path.exists():
+                if converted_path.is_file() or converted_path.is_symlink():
+                    print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
+                    continue
+                else:
+                    print(f"FATAL: {converted_path} already exists, but it isn't a file!")
+                    print("Unsure how to proceed, you should probably manually intervene here.")
+                    exit(1)
+
+            def job(src_file: Path, dest_file: Path):
+                print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
+                self._convert_file(src_file, dest_file)
+
+            executor.submit(job, item.filepath, converted_path)
         return None
 
     def _convert_file(self, file: Path, dest_file: Path):
+        # TODO: convert plugin? 🥺👉👈
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
         subprocess.run(
             [
@@ -118,8 +203,8 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _load_cds(self) -> list[CD]:
-        cds_path = Path(self.config["cds_path"].get())
-        conf_cds = self.config["cds"].get()
+        cds_path = Path(self.config["cds_path"].get(str)) # pyright: ignore[reportArgumentType]
+        conf_cds: dict = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
         cd_names = conf_cds.keys()
 
         cds: list[CD] = []
