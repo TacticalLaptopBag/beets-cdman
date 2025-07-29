@@ -1,5 +1,8 @@
 import shutil
 import os
+import re
+import psutil
+from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
 from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
@@ -60,10 +63,11 @@ class CDManPlugin(BeetsPlugin):
     def __init__(self, name: str | None = None):
         super().__init__(name)
         self.bitrate = self.config["bitrate"].get()
+        hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
             "bitrate": 128,
             "cds": [],
-            "threads": 8,
+            "threads": hw_thread_count,
         })
 
     def commands(self):
