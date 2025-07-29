@@ -52,11 +52,50 @@ class CD:
                 folders += ", "
         return f"{self.path}: [{folders}]"
 
+    def find_folder_path(self, dirname: str) -> Optional[Path]:
+        """
+        Extracts the path of the folder from the given dirname,
+        and then returns the current dirname of that folder.
+        Example: "05 Lemaitre" would return "07 Lemaitre" if Lemaitre was moved to position 7.
+        It could return None if Lemaitre is not in this CD.
+        """
+        # First we need to extract the actual name from the given directory name
+        # Currently dirname is expected to be in the example format of "09 Folder"
+        name_regex = r"^\d+\s+(.*$)"
+        name_match = re.match(name_regex, dirname)
+        if name_match is None:
+            # dirname isn't in the expected format
+            return None
+
+        # Ignore the numbers, the capture group should be everything after
+        # the folder's position
+        folder_name = name_match.group(1)
+        if type(folder_name) != str:
+            # Something went wrong, maybe nothing was captured?
+            return None
+
+        # We now have the name of the folder,
+        # let's see if it's even in this CD
+        folder_idx = self.find_folder(folder_name)
+        if folder_idx == -1:
+            # Folder is not in CD
+            return None
+        folder = self.folders[folder_idx]
+        
+        # Folder is in CD, retrieve the path and return it
+        return folder.get_path(folder_idx, self.path, len(self.folders))
+
     def has_folder(self, dirname: str) -> bool:
-        for folder in self.folders:
+        return self.find_folder(dirname) != -1
+
+    def find_folder(self, dirname: str) -> int:
+        """
+        Gets the index of the folder provided
+        """
+        for i, folder in enumerate(self.folders):
             if folder.dirname == dirname:
-                return True
-        return False
+                return i
+        return -1
 
 
 class CDManPlugin(BeetsPlugin):
@@ -83,17 +122,23 @@ class CDManPlugin(BeetsPlugin):
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
         cds = self._load_cds()
         
-        with ThreadPoolExecutor(max_workers=self.config["threads"].get()) as executor:
+        max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
+        with ThreadPoolExecutor(max_workers) as executor:
             for cd in cds:
-                # Find removed folders
+                # Find removed or reordered folders
                 if cd.path.exists():
                     for existing_path in cd.path.iterdir():
                         if not existing_path.is_dir():
                             continue
-                        if cd.has_folder(existing_path.name):
+                        new_path = cd.find_folder_path(existing_path.name)
+                        if new_path == existing_path:
                             continue
-                        print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
-                        executor.submit(shutil.rmtree, existing_path)
+                        if new_path is None:
+                            print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
+                            executor.submit(shutil.rmtree, existing_path)
+                        else:
+                            print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
+                            executor.submit(os.rename, existing_path, new_path)
 
                 # Convert
                 for i, folder in enumerate(cd.folders):
@@ -140,6 +185,7 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _convert_file(self, file: Path, dest_file: Path):
+        # TODO: convert plugin? 🥺👉👈
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
         subprocess.run(
             [
