@@ -114,6 +114,20 @@ class CDManPlugin(BeetsPlugin):
 
     def _get_subcommand(self):
         cmd = Subcommand("cdman", help="manage MP3 CDs")
+        cmd.parser.add_option(
+            "--threads", "-t",
+            help = 
+                "The maximum number of threads to use. " +
+                "This overrides the config value of the same name.",
+            type=int,
+        )
+        cmd.parser.add_option(
+            "--bitrate", "-b",
+            help = 
+                "The bitrate (in kbps) to use when converting files to MP3. " +
+                "This overrides the config value of the same name.",
+            type=int,
+        )
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
         cmd.func = cdman_cmd
@@ -123,6 +137,14 @@ class CDManPlugin(BeetsPlugin):
         cds = self._load_cds()
         
         max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
+        if opts.threads is not None:
+            print(f"Overriding config value 'threads': using {opts.threads} instead of {max_workers}")
+            max_workers = opts.threads
+
+        if opts.bitrate is not None:
+            print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
+            self.bitrate = opts.bitrate
+
         with ThreadPoolExecutor(max_workers) as executor:
             for cd in cds:
                 # Find removed or reordered folders
