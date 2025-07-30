@@ -101,13 +101,16 @@ class CD:
 class CDManPlugin(BeetsPlugin):
     def __init__(self, name: str | None = None):
         super().__init__(name)
-        self.bitrate = self.config["bitrate"].get()
         hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
+            "cache_path": "~/.cache/beets-cdman",
             "bitrate": 128,
             "cds": [],
             "threads": hw_thread_count,
         })
+
+        self.bitrate = self.config["bitrate"].get()
+        self.cache_path = Path(self.config["cache_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
 
     def commands(self):
         return [self._get_subcommand()]
@@ -121,7 +124,7 @@ class CDManPlugin(BeetsPlugin):
 
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
         cds = self._load_cds()
-        
+
         max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
         with ThreadPoolExecutor(max_workers) as executor:
             for cd in cds:
@@ -186,6 +189,13 @@ class CDManPlugin(BeetsPlugin):
 
     def _convert_file(self, file: Path, dest_file: Path):
         # TODO: convert plugin? 🥺👉👈
+        # Make directory structure in cache path in the following format:
+        # cd-name/folder-name/file.mp3
+        tmp_path = self.cache_path / dest_file.parent.parent.name / dest_file.parent.name
+        tmp_file_path = tmp_path / dest_file.name
+        if tmp_file_path.exists():
+            os.remove(tmp_file_path)
+
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
         subprocess.run(
             [
@@ -195,11 +205,16 @@ class CDManPlugin(BeetsPlugin):
                 "-acodec", "libmp3lame",
                 "-ar", "44100",
                 "-b:a", f"{self.bitrate}k",
-                "-vn", str(dest_file)
+                "-vn", str(tmp_file_path)
             ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+
+        # TODO: Does this even solve anything?
+        # What if the user cancels the command while moving the file?
+        # Now we're back to the original problem, just a lot more unlikely
+        tmp_file_path.rename(dest_file)
         return None
 
     def _load_cds(self) -> list[CD]:
