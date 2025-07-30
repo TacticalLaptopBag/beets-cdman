@@ -8,6 +8,7 @@ from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
+from magic import Magic
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
@@ -152,6 +153,24 @@ class CDManPlugin(BeetsPlugin):
                     self._clean_folder(items, folder_path, executor)
                     self._convert_folder(items, folder_path, executor)
         return None
+
+    def _do_folders_match(self, folder1: Path, folder2: Path) -> bool:
+        folder1_children = folder1.iterdir()
+        # Remember, can't use length check,
+        # because original folder may have extras like cover art.
+
+        for child1 in folder1_children:
+            mimetype1 = Magic(mime=True).from_file(child1)
+            if not mimetype1.startswith("audio/"):
+                continue
+            
+            child2 = folder2 / child1.name
+            if not child2.exists():
+                return False
+
+            # TODO: Compare audio file lengths, maybe use librosa
+
+            
 
     def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
         converted_paths: list[Path] = []
