@@ -214,7 +214,7 @@ class CDManPlugin(BeetsPlugin):
     def _convert_file(self, file: Path, dest_file: Path):
         # TODO: convert plugin? 🥺👉👈
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
-        subprocess.run(
+        result = subprocess.run(
             [
                 "ffmpeg",
                 "-i", str(file),
@@ -224,14 +224,18 @@ class CDManPlugin(BeetsPlugin):
                 "-b:a", f"{self.bitrate}k",
                 "-vn", str(dest_file)
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+        if result.returncode != 0:
+            sys.stderr.write(f"Error converting `{file}`! Look in `{dest_file.parent}` for ffmpeg logs.\n")
+            stdout_log_path = dest_file.with_suffix(".stdout.log")
+            stderr_log_path = dest_file.with_suffix(".stderr.log")
+            with stdout_log_path.open("wb") as stdout_log:
+                stdout_log.write(result.stdout)
+            with stderr_log_path.open("wb") as stderr_log:
+                stderr_log.write(result.stderr)
 
-        # TODO: Does this even solve anything?
-        # What if the user cancels the command while moving the file?
-        # Now we're back to the original problem, just a lot more unlikely
-        tmp_file_path.rename(dest_file)
         return None
 
     def _load_cds(self) -> list[CD]:
