@@ -1,15 +1,18 @@
+import math
+import sys
 import shutil
 import os
 import re
 import psutil
+import subprocess
+import ffmpeg
 from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item
+from beets.library import Library, parse_query_string, Item, Results
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
 from magic import Magic
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 
 
@@ -159,46 +162,45 @@ class CDManPlugin(BeetsPlugin):
                     self._convert_folder(items, folder_path, executor)
         return None
 
-    def _do_folders_match(self, folder1: Path, folder2: Path) -> bool:
-        folder1_children = folder1.iterdir()
-        # Remember, can't use length check,
-        # because original folder may have extras like cover art.
+    def _get_song_length(self, path: Path) -> float:
+        try:
+            probe = ffmpeg.probe(str(path))
+        except ffmpeg.Error:
+            return 0.0
 
-        for child1 in folder1_children:
-            mimetype1 = Magic(mime=True).from_file(child1)
-            if not mimetype1.startswith("audio/"):
-                continue
-            
-            child2 = folder2 / child1.name
-            if not child2.exists():
-                return False
+        stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
+        if stream is None:
+            return 0.0
 
-            # TODO: Compare audio file lengths, maybe use librosa
-
-            
+        duration = float(stream["duration"])
+        return duration
 
     def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
-        converted_paths: list[Path] = []
-        for item in items:
-            converted_paths.append(folder_path / (item.filepath.stem + ".mp3"))
+        converted_paths: list[Path] = [folder_path / (item.filepath.stem + ".mp3") for item in items]
 
         for path in folder_path.iterdir():
             if path.suffix != ".mp3":
                 continue
-            if not path.is_file() and not path.is_symlink():
+            if not path.is_file():
                 continue
 
             if path not in converted_paths:
-                print(f"Found removed file `{path}` in folder `{folder_path}`. This file will be removed.")
+                print(f"Found removed file `{path}`. This file will be removed.")
                 executor.submit(os.remove, path)
 
     def _convert_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
         for item in items:
             converted_path = folder_path / (item.filepath.stem + ".mp3")
             if converted_path.exists():
-                if converted_path.is_file() or converted_path.is_symlink():
-                    print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
-                    continue
+                if converted_path.is_file():
+                    converted_duration = math.ceil(self._get_song_length(converted_path))
+                    orig_duration = math.ceil(self._get_song_length(item.filepath))
+                    if converted_duration != orig_duration:
+                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted. (File lengths: {converted_duration} / {orig_duration})")
+                        os.remove(converted_path)
+                    else:
+                        print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
+                        continue
                 else:
                     print(f"FATAL: {converted_path} already exists, but it isn't a file!")
                     print("Unsure how to proceed, you should probably manually intervene here.")
