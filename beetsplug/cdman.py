@@ -195,7 +195,7 @@ class CDManPlugin(BeetsPlugin):
                     converted_duration = math.ceil(self._get_song_length(converted_path))
                     orig_duration = math.ceil(self._get_song_length(item.filepath))
                     if converted_duration != orig_duration:
-                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted. (File lengths: {converted_duration} / {orig_duration})")
+                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
                         os.remove(converted_path)
                     else:
                         print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
