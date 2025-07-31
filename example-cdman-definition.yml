@@ -1,0 +1,21 @@
+# This is an example CD definition file
+# You can create these yourself so you don't clutter your beets config,
+# or if you want to only convert a few CDs at a time rather than all at once.
+
+# The structure is simple, and exactly the same as the `cds` config field:
+# cd-name:
+#   - name: First Folder Name
+#     query: "'album:Album Name'"
+#   - name: Second Folder Name
+#     query: "'other query' 'anded with first part of this query'"
+
+ori:
+  - name: Blind Forest
+    query: "'album:Ori and the Blind Forest'"
+  - name: Will of the Wisps
+    query: "'album:Ori and the Will of the Wisps'"
+portal:
+  - name: Portal 2
+    query: "'album:Portal 2'"
+  - name: "Portal Stories: Mel" # Wrapped in quotes because of the colon
+    query: "'album:Portal Stories Mel'"
