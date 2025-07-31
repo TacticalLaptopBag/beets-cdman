@@ -321,7 +321,7 @@ class CDManPlugin(BeetsPlugin):
             return []
     
     def _load_cds(self, cd_data: CDDefinition) -> list[CD]:
-        cds_path = Path(self.config["cds_path"].get(str)) # pyright: ignore[reportArgumentType]
+        cds_path = Path(self.config["cds_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
         cds: list[CD] = []
 
         for cd_name in cd_data:
