@@ -8,11 +8,10 @@ import subprocess
 import ffmpeg
 from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item, Results
+from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
-from magic import Magic
 from concurrent.futures import ThreadPoolExecutor
 
 
