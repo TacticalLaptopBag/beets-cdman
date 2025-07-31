@@ -315,17 +315,3 @@ class CDManPlugin(BeetsPlugin):
 
         return cds
     
-    def __load_cds(self) -> list[CD]:
-        cds_path = Path(self.config["cds_path"].get(str)) # pyright: ignore[reportArgumentType]
-        conf_cds: dict = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
-        cd_names = conf_cds.keys()
-
-        cds: list[CD] = []
-        for cd_name in cd_names:
-            cd_path = cds_path / cd_name
-            cd = CD(cd_path)
-            for cd_item_dict in conf_cds[cd_name]:
-                cd_folder = CDFolder(cd_item_dict)
-                cd.folders.append(cd_folder)
-            cds.append(cd)
-        return cds
