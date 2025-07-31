@@ -10,6 +10,7 @@ from optparse import Values
 from pathlib import Path
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from confuse import RootView, YamlSource
 
 
 """
@@ -24,8 +25,10 @@ cdman:
               query: album:"Welcome (Reframed)"
 """
 
+CDDefinition = dict[str, list[dict[str, str]]]
+
 class CDFolder:
-    def __init__(self, item_dict: dict):
+    def __init__(self, item_dict: dict[str, str]):
         self.dirname = item_dict["name"]
         self.query = item_dict["query"]
 
@@ -120,7 +123,17 @@ class CDManPlugin(BeetsPlugin):
         return cmd
 
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
-        cds = self._load_cds()
+        cds: list[CD]
+        if len(args) == 0:
+            cds = self._load_cds_from_config()
+        else:
+            cds = []
+            for arg in args:
+                arg_path = Path(arg)
+                if not arg_path.exists():
+                    print(f"No such file or directory: {arg_path}")
+                    continue
+                cds.extend(self._load_cds_from_path(Path(arg)))
         
         max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
         with ThreadPoolExecutor(max_workers) as executor:
@@ -202,7 +215,48 @@ class CDManPlugin(BeetsPlugin):
         )
         return None
 
-    def _load_cds(self) -> list[CD]:
+    def _load_cds_from_config(self) -> list[CD]:
+        conf_cds: CDDefinition = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
+        cds = self._load_cds(conf_cds)
+        return cds
+    
+    def _load_cds_from_path(self, path: Path) -> list[CD]:
+        if path.is_dir():
+            child_cds: list[CD] = []
+            for child in path.iterdir():
+                child_cds.extend(self._load_cds_from_path(child))
+            return child_cds
+
+        if not path.is_file():
+            return []
+        if path.suffix != ".yml":
+            print(f"`{path}` is not a YAML file, ignoring.")
+            return []
+
+        try:
+            config = RootView([YamlSource(str(path))])
+            cds_dict: CDDefinition = config.get(dict) # pyright: ignore[reportAssignmentType]
+            cds = self._load_cds(cds_dict)
+            return cds
+        except:
+            print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
+            return []
+    
+    def _load_cds(self, cd_data: CDDefinition) -> list[CD]:
+        cds_path = Path(self.config["cds_path"].get(str)) # pyright: ignore[reportArgumentType]
+        cds: list[CD] = []
+
+        for cd_name in cd_data:
+            cd = CD(cds_path / cd_name)
+            cd_folders_data = cd_data[cd_name]
+            for cd_folder_data in cd_folders_data:
+                cd_folder = CDFolder(cd_folder_data)
+                cd.folders.append(cd_folder)
+            cds.append(cd) 
+
+        return cds
+    
+    def __load_cds(self) -> list[CD]:
         cds_path = Path(self.config["cds_path"].get(str)) # pyright: ignore[reportArgumentType]
         conf_cds: dict = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
         cd_names = conf_cds.keys()
