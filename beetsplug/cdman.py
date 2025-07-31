@@ -110,7 +110,6 @@ class CDManPlugin(BeetsPlugin):
         hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
             "bitrate": 128,
-            "cds": [],
             "threads": hw_thread_count,
         })
 
@@ -275,6 +274,14 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _load_cds_from_config(self) -> list[CD]:
+        if "cds" not in self.config:
+            print(
+                "No CDs defined in config! "
+                "Either add CDs in your beets config file or create "
+                "CD definition files and pass them as arguments."
+            )
+            return []
+
         conf_cds: CDDefinition = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
         cds = self._load_cds(conf_cds)
         return cds
