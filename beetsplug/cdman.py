@@ -1,14 +1,17 @@
+import math
+import sys
 import shutil
 import os
 import re
 import psutil
+import subprocess
+import ffmpeg
 from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
 from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from confuse import RootView, YamlSource
 
@@ -104,7 +107,6 @@ class CD:
 class CDManPlugin(BeetsPlugin):
     def __init__(self, name: str | None = None):
         super().__init__(name)
-        self.bitrate = self.config["bitrate"].get()
         hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
             "bitrate": 128,
@@ -112,11 +114,27 @@ class CDManPlugin(BeetsPlugin):
             "threads": hw_thread_count,
         })
 
+        self.bitrate = self.config["bitrate"].get()
+
     def commands(self):
         return [self._get_subcommand()]
 
     def _get_subcommand(self):
         cmd = Subcommand("cdman", help="manage MP3 CDs")
+        cmd.parser.add_option(
+            "--threads", "-t",
+            help = 
+                "The maximum number of threads to use. " +
+                "This overrides the config value of the same name.",
+            type=int,
+        )
+        cmd.parser.add_option(
+            "--bitrate", "-b",
+            help = 
+                "The bitrate (in kbps) to use when converting files to MP3. " +
+                "This overrides the config value of the same name.",
+            type=int,
+        )
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
         cmd.func = cdman_cmd
@@ -136,6 +154,14 @@ class CDManPlugin(BeetsPlugin):
                 cds.extend(self._load_cds_from_path(Path(arg)))
         
         max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
+        if opts.threads is not None:
+            print(f"Overriding config value 'threads': using {opts.threads} instead of {max_workers}")
+            max_workers = opts.threads
+
+        if opts.bitrate is not None:
+            print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
+            self.bitrate = opts.bitrate
+
         with ThreadPoolExecutor(max_workers) as executor:
             for cd in cds:
                 # Find removed or reordered folders
@@ -143,15 +169,22 @@ class CDManPlugin(BeetsPlugin):
                     for existing_path in cd.path.iterdir():
                         if not existing_path.is_dir():
                             continue
+
+                        # Existing CD folder found.
                         new_path = cd.find_folder_path(existing_path.name)
                         if new_path == existing_path:
+                            # Folder has not been removed or reordered
                             continue
+
                         if new_path is None:
+                            # Folder was not found in CD, must have been removed
                             print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
                             executor.submit(shutil.rmtree, existing_path)
-                        else:
-                            print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
-                            executor.submit(os.rename, existing_path, new_path)
+                            continue
+
+                        # Folder was found in CD, but at a different position
+                        print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
+                        executor.submit(os.rename, existing_path, new_path)
 
                 # Convert
                 for i, folder in enumerate(cd.folders):
@@ -163,28 +196,45 @@ class CDManPlugin(BeetsPlugin):
                     self._convert_folder(items, folder_path, executor)
         return None
 
+    def _get_song_length(self, path: Path) -> float:
+        try:
+            probe = ffmpeg.probe(str(path))
+        except ffmpeg.Error:
+            return 0.0
+
+        stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
+        if stream is None:
+            return 0.0
+
+        duration = float(stream["duration"])
+        return duration
+
     def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
-        converted_paths: list[Path] = []
-        for item in items:
-            converted_paths.append(folder_path / (item.filepath.stem + ".mp3"))
+        converted_paths: list[Path] = [folder_path / (item.filepath.stem + ".mp3") for item in items]
 
         for path in folder_path.iterdir():
             if path.suffix != ".mp3":
                 continue
-            if not path.is_file() and not path.is_symlink():
+            if not path.is_file():
                 continue
 
             if path not in converted_paths:
-                print(f"Found removed file `{path}` in folder `{folder_path}`. This file will be removed.")
+                print(f"Found removed file `{path}`. This file will be removed.")
                 executor.submit(os.remove, path)
 
     def _convert_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
         for item in items:
             converted_path = folder_path / (item.filepath.stem + ".mp3")
             if converted_path.exists():
-                if converted_path.is_file() or converted_path.is_symlink():
-                    print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
-                    continue
+                if converted_path.is_file():
+                    converted_duration = math.ceil(self._get_song_length(converted_path))
+                    orig_duration = math.ceil(self._get_song_length(item.filepath))
+                    if converted_duration != orig_duration:
+                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
+                        os.remove(converted_path)
+                    else:
+                        print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
+                        continue
                 else:
                     print(f"FATAL: {converted_path} already exists, but it isn't a file!")
                     print("Unsure how to proceed, you should probably manually intervene here.")
@@ -200,7 +250,7 @@ class CDManPlugin(BeetsPlugin):
     def _convert_file(self, file: Path, dest_file: Path):
         # TODO: convert plugin? 🥺👉👈
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
-        subprocess.run(
+        result = subprocess.run(
             [
                 "ffmpeg",
                 "-i", str(file),
@@ -210,9 +260,18 @@ class CDManPlugin(BeetsPlugin):
                 "-b:a", f"{self.bitrate}k",
                 "-vn", str(dest_file)
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
+        if result.returncode != 0:
+            sys.stderr.write(f"Error converting `{file}`! Look in `{dest_file.parent}` for ffmpeg logs.\n")
+            stdout_log_path = dest_file.with_suffix(".stdout.log")
+            stderr_log_path = dest_file.with_suffix(".stderr.log")
+            with stdout_log_path.open("wb") as stdout_log:
+                stdout_log.write(result.stdout)
+            with stderr_log_path.open("wb") as stderr_log:
+                stderr_log.write(result.stderr)
+
         return None
 
     def _load_cds_from_config(self) -> list[CD]:
