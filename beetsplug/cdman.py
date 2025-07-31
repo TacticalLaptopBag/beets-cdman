@@ -132,15 +132,22 @@ class CDManPlugin(BeetsPlugin):
                     for existing_path in cd.path.iterdir():
                         if not existing_path.is_dir():
                             continue
+
+                        # Existing CD folder found.
                         new_path = cd.find_folder_path(existing_path.name)
                         if new_path == existing_path:
+                            # Folder has not been removed or reordered
                             continue
+
                         if new_path is None:
+                            # Folder was not found in CD, must have been removed
                             print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
                             executor.submit(shutil.rmtree, existing_path)
-                        else:
-                            print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
-                            executor.submit(os.rename, existing_path, new_path)
+                            continue
+
+                        # Folder was found in CD, but at a different position
+                        print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
+                        executor.submit(os.rename, existing_path, new_path)
 
                 # Convert
                 for i, folder in enumerate(cd.folders):
