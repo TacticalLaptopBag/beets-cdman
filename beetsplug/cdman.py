@@ -311,7 +311,6 @@ class CDManPlugin(BeetsPlugin):
         if not path.is_file():
             return []
         if path.suffix != ".yml":
-            print(f"`{path}` is not a YAML file, ignoring.")
             return []
 
         try:
