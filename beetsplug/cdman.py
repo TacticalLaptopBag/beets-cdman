@@ -134,6 +134,15 @@ class CDManPlugin(BeetsPlugin):
                 "This overrides the config value of the same name.",
             type=int,
         )
+        cmd.parser.add_option(
+            "--dry", "-d",
+            help =
+                "When run with this flag present, 'cdman' goes through "
+                "all the motions of a normal command, but doesn't "
+                "actually perform any conversions. "
+                "Note that directories may be created in your cds_path directory.",
+            action="store_true",
+        )
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
         cmd.func = cdman_cmd
@@ -249,6 +258,9 @@ class CDManPlugin(BeetsPlugin):
     def _convert_file(self, file: Path, dest_file: Path):
         # TODO: convert plugin? 🥺👉👈
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
+        if self.dry:
+            return None
+        
         result = subprocess.run(
             [
                 "ffmpeg",
