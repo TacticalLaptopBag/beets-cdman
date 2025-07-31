@@ -171,6 +171,8 @@ class CDManPlugin(BeetsPlugin):
             print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
             self.bitrate = opts.bitrate
 
+        self.dry = opts.dry
+
         with ThreadPoolExecutor(max_workers) as executor:
             for cd in cds:
                 # Find removed or reordered folders
