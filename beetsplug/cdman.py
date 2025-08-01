@@ -8,7 +8,7 @@ import subprocess
 import ffmpeg
 from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item
+from beets.library import Library, parse_query_string, Item, Results
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
@@ -115,6 +115,7 @@ class CDManPlugin(BeetsPlugin):
         })
 
         self.bitrate = self.config["bitrate"].get()
+        self.max_threads: int = self.config["threads"].get(int) # pyright: ignore[reportAttributeAccessIssue]
 
     def commands(self):
         return [self._get_subcommand()]
@@ -144,6 +145,12 @@ class CDManPlugin(BeetsPlugin):
                 "Note that directories may be created in your cds_path directory.",
             action="store_true",
         )
+        cmd.parser.add_option(
+            "--list-unused", "-l",
+            help = 
+                "Lists all tracks in your library that are not in any CD definitions.",
+            action="store_true",
+        )
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
         cmd.func = cdman_cmd
@@ -162,10 +169,9 @@ class CDManPlugin(BeetsPlugin):
                     continue
                 cds.extend(self._load_cds_from_path(Path(arg)))
         
-        max_workers: int = self.config["threads"].get(int) # pyright: ignore[reportAssignmentType]
         if opts.threads is not None:
-            print(f"Overriding config value 'threads': using {opts.threads} instead of {max_workers}")
-            max_workers = opts.threads
+            print(f"Overriding config value 'threads': using {opts.threads} instead of {self.max_threads}")
+            self.max_threads = opts.threads
 
         if opts.bitrate is not None:
             print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
@@ -173,7 +179,40 @@ class CDManPlugin(BeetsPlugin):
 
         self.dry = opts.dry
 
-        with ThreadPoolExecutor(max_workers) as executor:
+        if opts.list_unused:
+            self._list_unused(cds, lib)
+        else:
+            self._populate_cds(cds, lib)
+
+        return None
+
+    def _item_to_track_listing(self, item: Item) -> str:
+        return f"{item.get("artist")} - {item.get("album")} - {item.get("title")}"
+
+    def _list_unused(self, cds: list[CD], lib: Library):
+        unused_tracks = set([self._item_to_track_listing(item) for item in lib.items()])
+        removed_tracks: set[str] = set()
+        for cd in cds:
+            for folder in cd.folders:
+                folder_query, _ = parse_query_string(folder.query, Item)
+                folder_items = lib.items(folder_query)
+                for item in folder_items:
+                    track = self._item_to_track_listing(item)
+                    if track not in removed_tracks:
+                        unused_tracks.remove(track)
+                        removed_tracks.add(track)
+            
+        if len(unused_tracks) == 0:
+            print("No track has been left untouched.")
+            return None
+
+        print("Tracks not in any defined CD:")
+        for unused_track in unused_tracks:
+            print(unused_track)
+        return None
+
+    def _populate_cds(self, cds: list[CD], lib: Library):
+        with ThreadPoolExecutor(self.max_threads) as executor:
             for cd in cds:
                 # Find removed or reordered folders
                 if cd.path.exists():
