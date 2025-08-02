@@ -180,11 +180,9 @@ def get_cd_splits(cd: CD) -> list[Path]:
             if cd.type == CDType.MP3:
                 file_size = file.stat().st_size
                 max_size = MAX_SIZE_MP3
-            elif cd.type == CDType.AUDIO:
+            else:
                 file_size = get_song_length(file)
                 max_size = MAX_SIZE_AUDIO
-            else:
-                raise ValueError(f"Unexpected CD type: {cd.type}")
                 
             sum += file_size
             if sum >= max_size:
@@ -456,27 +454,26 @@ class CDManPlugin(BeetsPlugin):
     def _report_size(self, cds: list[CD]):
         for cd in cds:
             cd_size = cd.get_size()
-            if cd.type == CDType.MP3 and cd_size > MAX_SIZE_MP3:
-                cd_size_mb = cd_size / 1_000_000
-                max_size_mb = MAX_SIZE_MP3 / 1_000_000
-                cd_splits = get_cd_splits(cd)
-                print(
-                    f"WARNING: MP3 CD {cd.path.name} is {cd_size_mb:.1f} MB, "
-                    f"which is larger than {max_size_mb} MB! "
-                    "This will not fit on a traditional CD. "
-                    f"However, you could split the CD into {len(cd_splits)} CDs, "
-                    "if you divide the CD into chunks starting with these files:"
+            size_warning: str
+            cd_max_size: int
+            if cd.type == CDType.MP3:
+                cd_max_size = MAX_SIZE_MP3
+                size_warning = (
+                    f"MP3 CD {cd.path.name} is {cd_size / 1_000_000:.1f} MB, "
+                    f"which is larger than {cd_max_size / 1_000_000} MB!"
                 )
-                for split in cd_splits:
-                    print(split)
-            elif cd.type == CDType.AUDIO and cd_size > MAX_SIZE_AUDIO:
-                cd_size_min = cd_size / 60
-                max_size_min = MAX_SIZE_AUDIO / 60
+            else:
+                cd_max_size = MAX_SIZE_AUDIO
+                size_warning = (
+                    f"Audio CD {cd.path.name} is {cd_size / 60:.1f} minutes long, "
+                    f"which is longer than {cd_max_size / 60} minutes!"
+                )
+
+            if cd_size > cd_max_size:
+                print()
                 cd_splits = get_cd_splits(cd)
                 print(
-                    f"WARNING: Audio CD {cd.path.name} is {cd_size_min:.1f} minutes long, "
-                    f"which is longer than {max_size_min} minutes! "
-                    "This will not fit on a traditional CD. "
+                    f"WARNING: {size_warning} "
                     f"However, you could split the CD into {len(cd_splits)} CDs, "
                     "if you divide the CD into chunks starting with these files:"
                 )
