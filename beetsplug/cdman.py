@@ -1,20 +1,23 @@
-from enum import Enum
 import math
 import sys
 import shutil
 import os
-import re
 import psutil
 import subprocess
-import ffmpeg
-from typing import Iterable, Optional
+from typing import Iterable
 from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item, Results
+from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from confuse import RootView, YamlSource
+
+from .cd_folder import CDFolder
+from .cd_type import CDType
+from .util import get_song_length
+
+from .cd import CD, MAX_SIZE_AUDIO, MAX_SIZE_MP3, CDDefinition
 
 
 """
@@ -35,161 +38,6 @@ cdman:
                 - "'artist:Daft Punk' 'album:Discovery'"
                 - "'artist:Fantom' 'album:Discovery'"
 """
-
-MAX_SIZE_MP3 = 700_000_000
-MAX_SIZE_AUDIO = 4_800
-
-CDDefinition = dict[str, list[dict[str, str]]]
-
-
-def get_song_length(path: Path) -> float:
-    try:
-        probe = ffmpeg.probe(str(path))
-    except ffmpeg.Error:
-        return 0.0
-
-    stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
-    if stream is None:
-        return 0.0
-
-    duration = float(stream["duration"])
-    return duration
-
-
-def get_all_files(directory: Path) -> list[Path]:
-    return [Path(walk_listing[0] / file) for walk_listing in directory.walk() for file in walk_listing[2]]
-
-
-def get_directory_size(directory: Path) -> int:
-    files = get_all_files(directory)
-    file_sizes = [file.stat().st_size for file in files]
-    return sum(file_sizes)
-
-
-def get_directory_audio_length(directory: Path) -> float:
-    files = get_all_files(directory)
-    audio_files = list(filter(lambda f: f.suffix == ".mp3", files))
-    durations = [get_song_length(audio_file) for audio_file in audio_files]
-    return sum(durations)
-
-
-class CDFolder:
-    def __init__(self, item_dict: dict[str, str]):
-        self.dirname = item_dict["name"]
-        self.query = item_dict["query"]
-
-    def get_path(self, idx: int, cd_path: Path, total_count: int) -> Path:
-        padding = len(str(total_count))
-        padded_idx = str(idx + 1).rjust(padding, "0")
-        indexed_dirname = f"{padded_idx} {self.dirname}"
-        return cd_path / indexed_dirname
-
-    def __str__(self) -> str:
-        return f"{self.dirname}: {self.query}"
-
-
-class CDType(Enum):
-    AUDIO = 0
-    MP3 = 1
-
-    @classmethod
-    def from_name(cls, name: str) -> "CDType":
-        return cls[name.upper()]
-
-
-class CD:
-    def __init__(self, path: Path, cd_type: CDType):
-        self.path = path
-        self.folders: list[CDFolder] = []
-        self.type = cd_type
-
-    def __str__(self) -> str:
-        folders = ""
-        for i, folder in enumerate(self.folders):
-            folders += str(folder)
-            if i != len(self.folders) - 1:
-                folders += ", "
-        return f"{self.path}: [{folders}]"
-
-    def find_folder_path(self, dirname: str) -> Optional[Path]:
-        """
-        Extracts the path of the folder from the given dirname,
-        and then returns the current dirname of that folder.
-        Example: "05 Lemaitre" would return "07 Lemaitre" if Lemaitre was moved to position 7.
-        It could return None if Lemaitre is not in this CD.
-        """
-        # First we need to extract the actual name from the given directory name
-        # Currently dirname is expected to be in the example format of "09 Folder"
-        name_regex = r"^\d+\s+(.*$)"
-        name_match = re.match(name_regex, dirname)
-        if name_match is None:
-            # dirname isn't in the expected format
-            return None
-
-        # Ignore the numbers, the capture group should be everything after
-        # the folder's position
-        folder_name = name_match.group(1)
-        if type(folder_name) != str:
-            # Something went wrong, maybe nothing was captured?
-            return None
-
-        # We now have the name of the folder,
-        # let's see if it's even in this CD
-        folder_idx = self.find_folder(folder_name)
-        if folder_idx == -1:
-            # Folder is not in CD
-            return None
-        folder = self.folders[folder_idx]
-        
-        # Folder is in CD, retrieve the path and return it
-        return folder.get_path(folder_idx, self.path, len(self.folders))
-
-    def has_folder(self, dirname: str) -> bool:
-        return self.find_folder(dirname) != -1
-
-    def find_folder(self, dirname: str) -> int:
-        """
-        Gets the index of the folder provided
-        """
-        for i, folder in enumerate(self.folders):
-            if folder.dirname == dirname:
-                return i
-        return -1
-
-    def get_size(self) -> int | float:
-        """
-        Returns size of CD. If `type` is MP3, returns size in bytes as an int.
-        If `type` is AUDIO, returns size in seconds as a float.
-        """
-        match self.type:
-            case CDType.AUDIO:
-                return get_directory_audio_length(self.path)
-            case CDType.MP3:
-                return get_directory_size(self.path)
-
-
-def get_cd_splits(cd: CD) -> list[Path]:
-    files = get_all_files(cd.path)
-    splits: list[Path] = []
-    sum = 0
-    
-    if cd.type == CDType.MP3:
-        for file in files:
-            file_size = 0
-            max_size: int
-            if cd.type == CDType.MP3:
-                file_size = file.stat().st_size
-                max_size = MAX_SIZE_MP3
-            else:
-                file_size = get_song_length(file)
-                max_size = MAX_SIZE_AUDIO
-                
-            sum += file_size
-            if sum >= max_size:
-                splits.append(file)
-                sum = file_size
-    
-    return splits
 
 
 class CDManPlugin(BeetsPlugin):
@@ -471,7 +319,7 @@ class CDManPlugin(BeetsPlugin):
 
             if cd_size > cd_max_size:
                 print()
-                cd_splits = get_cd_splits(cd)
+                cd_splits = cd.get_splits()
                 print(
                     f"WARNING: {size_warning} "
                     f"However, you could split the CD into {len(cd_splits)} CDs, "
