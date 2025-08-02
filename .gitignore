@@ -202,3 +202,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+
+# Test CD files
+cds/
+cd_defs/
