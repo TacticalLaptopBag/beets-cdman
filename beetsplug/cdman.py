@@ -1,3 +1,4 @@
+from enum import Enum
 import math
 import sys
 import shutil
@@ -22,13 +23,55 @@ cdman:
     bitrate: 128
     cds:
         arcadian:
-            - dirname: The Arcadian Wild
-              query: album:"The Arcadian Wild"
-            - dirname: Welcome
-              query: album:"Welcome (Reframed)"
+            type: mp3
+            folders:
+                - name: The Arcadian Wild
+                  query: "'album:The Arcadian Wild'"
+                - name: Welcome
+                  query: "'album:Welcome (Reframed)'"
+        discovery:
+            type: audio
+            track_queries:
+                - "'artist:Daft Punk' 'album:Discovery'"
+                - "'artist:Fantom' 'album:Discovery'"
 """
 
+MAX_SIZE_MP3 = 700_000_000
+MAX_SIZE_AUDIO = 4_800
+
 CDDefinition = dict[str, list[dict[str, str]]]
+
+
+def get_song_length(path: Path) -> float:
+    try:
+        probe = ffmpeg.probe(str(path))
+    except ffmpeg.Error:
+        return 0.0
+
+    stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
+    if stream is None:
+        return 0.0
+
+    duration = float(stream["duration"])
+    return duration
+
+
+def get_all_files(directory: Path) -> list[Path]:
+    return [Path(walk_listing[0] / file) for walk_listing in directory.walk() for file in walk_listing[2]]
+
+
+def get_directory_size(directory: Path) -> int:
+    files = get_all_files(directory)
+    file_sizes = [file.stat().st_size for file in files]
+    return sum(file_sizes)
+
+
+def get_directory_audio_length(directory: Path) -> float:
+    files = get_all_files(directory)
+    audio_files = list(filter(lambda f: f.suffix == ".mp3", files))
+    durations = [get_song_length(audio_file) for audio_file in audio_files]
+    return sum(durations)
+
 
 class CDFolder:
     def __init__(self, item_dict: dict[str, str]):
@@ -45,10 +88,20 @@ class CDFolder:
         return f"{self.dirname}: {self.query}"
 
 
+class CDType(Enum):
+    AUDIO = 0
+    MP3 = 1
+
+    @classmethod
+    def from_name(cls, name: str) -> "CDType":
+        return cls[name.upper()]
+
+
 class CD:
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, cd_type: CDType):
         self.path = path
         self.folders: list[CDFolder] = []
+        self.type = cd_type
 
     def __str__(self) -> str:
         folders = ""
@@ -103,6 +156,17 @@ class CD:
                 return i
         return -1
 
+    def get_size(self) -> int | float:
+        """
+        Returns size of CD. If `type` is MP3, returns size in bytes as an int.
+        If `type` is AUDIO, returns size in seconds as a float.
+        """
+        match self.type:
+            case CDType.AUDIO:
+                return get_directory_audio_length(self.path)
+            case CDType.MP3:
+                return get_directory_size(self.path)
+
 
 class CDManPlugin(BeetsPlugin):
     def __init__(self, name: str | None = None):
@@ -114,6 +178,7 @@ class CDManPlugin(BeetsPlugin):
             "threads": hw_thread_count,
         })
 
+        self.cds_path = Path(self.config["cds_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
         self.bitrate = self.config["bitrate"].get()
         self.max_threads: int = self.config["threads"].get(int) # pyright: ignore[reportAttributeAccessIssue]
 
@@ -183,6 +248,7 @@ class CDManPlugin(BeetsPlugin):
             self._list_unused(cds, lib)
         else:
             self._populate_cds(cds, lib)
+            self._report_size(cds)
 
         return None
 
@@ -246,19 +312,6 @@ class CDManPlugin(BeetsPlugin):
                     self._convert_folder(items, folder_path, executor)
         return None
 
-    def _get_song_length(self, path: Path) -> float:
-        try:
-            probe = ffmpeg.probe(str(path))
-        except ffmpeg.Error:
-            return 0.0
-
-        stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
-        if stream is None:
-            return 0.0
-
-        duration = float(stream["duration"])
-        return duration
-
     def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
         converted_paths: list[Path] = [folder_path / (item.filepath.stem + ".mp3") for item in items]
 
@@ -277,8 +330,8 @@ class CDManPlugin(BeetsPlugin):
             converted_path = folder_path / (item.filepath.stem + ".mp3")
             if converted_path.exists():
                 if converted_path.is_file():
-                    converted_duration = math.ceil(self._get_song_length(converted_path))
-                    orig_duration = math.ceil(self._get_song_length(item.filepath))
+                    converted_duration = math.ceil(get_song_length(converted_path))
+                    orig_duration = math.ceil(get_song_length(item.filepath))
                     if abs(converted_duration - orig_duration) > 1:
                         print(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
                         os.remove(converted_path)
@@ -362,11 +415,10 @@ class CDManPlugin(BeetsPlugin):
             return []
     
     def _load_cds(self, cd_data: CDDefinition) -> list[CD]:
-        cds_path = Path(self.config["cds_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
         cds: list[CD] = []
 
         for cd_name in cd_data:
-            cd = CD(cds_path / cd_name)
+            cd = CD(self.cds_path / cd_name, CDType.MP3)
             cd_folders_data = cd_data[cd_name]
             for cd_folder_data in cd_folders_data:
                 cd_folder = CDFolder(cd_folder_data)
@@ -374,4 +426,23 @@ class CDManPlugin(BeetsPlugin):
             cds.append(cd) 
 
         return cds
-    
+
+    def _report_size(self, cds: list[CD]):
+        for cd in cds:
+            cd_size = cd.get_size()
+            if cd.type == CDType.MP3 and cd_size > MAX_SIZE_MP3:
+                cd_size_mb = cd_size / 1_000_000
+                max_size_mb = MAX_SIZE_MP3 / 1_000_000
+                print(
+                    f"WARNING: MP3 CD {cd.path.name} is {cd_size_mb:.1f} MB, "
+                    f"which is larger than {max_size_mb} MB! "
+                    "This will not fit on a traditional CD."
+                )
+            elif cd.type == CDType.AUDIO and cd_size > MAX_SIZE_AUDIO:
+                cd_size_min = cd_size / 60
+                max_size_min = MAX_SIZE_AUDIO / 60
+                print(
+                    f"WARNING: Audio CD {cd.path.name} is {cd_size_min:.1f} minutes long, "
+                    f"which is longer than {max_size_min} minutes! "
+                    "This will not fit on a traditional CD."
+                )
