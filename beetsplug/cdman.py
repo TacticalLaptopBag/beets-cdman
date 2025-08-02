@@ -60,21 +60,6 @@ def get_all_files(directory: Path) -> list[Path]:
     return [Path(walk_listing[0] / file) for walk_listing in directory.walk() for file in walk_listing[2]]
 
 
-def get_cd_splits(cd_path: Path) -> list[Path]:
-    files = get_all_files(cd_path)
-    splits: list[Path] = []
-    size_sum = 0
-    
-    for file in files:
-        file_size = file.stat().st_size
-        size_sum += file_size
-        if size_sum >= MAX_SIZE_MP3:
-            splits.append(file)
-            size_sum = file_size
-    
-    return splits
-
-
 def get_directory_size(directory: Path) -> int:
     files = get_all_files(directory)
     file_sizes = [file.stat().st_size for file in files]
@@ -181,6 +166,32 @@ class CD:
                 return get_directory_audio_length(self.path)
             case CDType.MP3:
                 return get_directory_size(self.path)
+
+
+def get_cd_splits(cd: CD) -> list[Path]:
+    files = get_all_files(cd.path)
+    splits: list[Path] = []
+    sum = 0
+    
+    if cd.type == CDType.MP3:
+        for file in files:
+            file_size = 0
+            max_size: int
+            if cd.type == CDType.MP3:
+                file_size = file.stat().st_size
+                max_size = MAX_SIZE_MP3
+            elif cd.type == CDType.AUDIO:
+                file_size = get_song_length(file)
+                max_size = MAX_SIZE_AUDIO
+            else:
+                raise ValueError(f"Unexpected CD type: {cd.type}")
+                
+            sum += file_size
+            if sum >= max_size:
+                splits.append(file)
+                sum = file_size
+    
+    return splits
 
 
 class CDManPlugin(BeetsPlugin):
@@ -448,7 +459,7 @@ class CDManPlugin(BeetsPlugin):
             if cd.type == CDType.MP3 and cd_size > MAX_SIZE_MP3:
                 cd_size_mb = cd_size / 1_000_000
                 max_size_mb = MAX_SIZE_MP3 / 1_000_000
-                cd_splits = get_cd_splits(cd.path)
+                cd_splits = get_cd_splits(cd)
                 print(
                     f"WARNING: MP3 CD {cd.path.name} is {cd_size_mb:.1f} MB, "
                     f"which is larger than {max_size_mb} MB! "
@@ -461,8 +472,13 @@ class CDManPlugin(BeetsPlugin):
             elif cd.type == CDType.AUDIO and cd_size > MAX_SIZE_AUDIO:
                 cd_size_min = cd_size / 60
                 max_size_min = MAX_SIZE_AUDIO / 60
+                cd_splits = get_cd_splits(cd)
                 print(
                     f"WARNING: Audio CD {cd.path.name} is {cd_size_min:.1f} minutes long, "
                     f"which is longer than {max_size_min} minutes! "
-                    "This will not fit on a traditional CD."
+                    "This will not fit on a traditional CD. "
+                    f"However, you could split the CD into {len(cd_splits)} CDs, "
+                    "if you divide the CD into chunks starting with these files:"
                 )
+                for split in cd_splits:
+                    print(split)
