@@ -1,5 +1,5 @@
 [project]
-name = "cdman"
+name = "beets-cdman"
 version = "0.1.0"
 description = ""
 authors = [
