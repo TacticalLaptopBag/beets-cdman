@@ -10,8 +10,10 @@ from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from confuse import RootView, YamlSource
+from more_itertools import divide
+
+from .dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 
 from .cd_folder import CDFolder
 from .cd_type import CDType
@@ -51,8 +53,12 @@ class CDManPlugin(BeetsPlugin):
         })
 
         self.cds_path = Path(self.config["cds_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
-        self.bitrate = self.config["bitrate"].get()
+        self.bitrate = self.config["bitrate"].get(int)
         self.max_threads: int = self.config["threads"].get(int) # pyright: ignore[reportAttributeAccessIssue]
+        if self.max_threads <= 0:
+            raise ValueError("Config field 'threads' must be a positive integer!")
+
+        self.executor = DimensionalThreadPoolExecutor(self.max_threads)
 
     def commands(self):
         return [self._get_subcommand()]
@@ -122,6 +128,7 @@ class CDManPlugin(BeetsPlugin):
             self._populate_cds(cds, lib)
             self._report_size(cds)
 
+        self.executor.shutdown()
         return None
 
     def _item_to_track_listing(self, item: Item) -> str:
@@ -150,41 +157,40 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _populate_cds(self, cds: list[CD], lib: Library):
-        with ThreadPoolExecutor(self.max_threads) as executor:
-            for cd in cds:
-                # Find removed or reordered folders
-                if cd.path.exists():
-                    for existing_path in cd.path.iterdir():
-                        if not existing_path.is_dir():
-                            continue
+        for cd in cds:
+            # Find removed or reordered folders
+            if cd.path.exists():
+                for existing_path in cd.path.iterdir():
+                    if not existing_path.is_dir():
+                        continue
 
-                        # Existing CD folder found.
-                        new_path = cd.find_folder_path(existing_path.name)
-                        if new_path == existing_path:
-                            # Folder has not been removed or reordered
-                            continue
+                    # Existing CD folder found.
+                    new_path = cd.find_folder_path(existing_path.name)
+                    if new_path == existing_path:
+                        # Folder has not been removed or reordered
+                        continue
 
-                        if new_path is None:
-                            # Folder was not found in CD, must have been removed
-                            print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
-                            executor.submit(shutil.rmtree, existing_path)
-                            continue
+                    if new_path is None:
+                        # Folder was not found in CD, must have been removed
+                        print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
+                        self.executor.submit(shutil.rmtree, existing_path)
+                        continue
 
-                        # Folder was found in CD, but at a different position
-                        print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
-                        executor.submit(os.rename, existing_path, new_path)
+                    # Folder was found in CD, but at a different position
+                    print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
+                    self.executor.submit(os.rename, existing_path, new_path)
 
-                # Convert
-                for i, folder in enumerate(cd.folders):
-                    query, _ = parse_query_string(folder.query, Item)
-                    folder_path = folder.get_path(i, cd.path, len(cd.folders))
-                    folder_path.mkdir(parents=True, exist_ok=True)
-                    items = lib.items(query)
-                    self._clean_folder(items, folder_path, executor)
-                    self._convert_folder(items, folder_path, executor)
+            # Convert
+            for i, folder in enumerate(cd.folders):
+                query, _ = parse_query_string(folder.query, Item)
+                folder_path = folder.get_path(i, cd.path, len(cd.folders))
+                folder_path.mkdir(parents=True, exist_ok=True)
+                items = lib.items(query)
+                self._clean_folder(items, folder_path)
+                self._convert_folder(items, folder_path)
         return None
 
-    def _clean_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
+    def _clean_folder(self, items: Iterable[Item], folder_path: Path):
         converted_paths: list[Path] = [folder_path / (item.filepath.stem + ".mp3") for item in items]
 
         for path in folder_path.iterdir():
@@ -195,9 +201,14 @@ class CDManPlugin(BeetsPlugin):
 
             if path not in converted_paths:
                 print(f"Found removed file `{path}`. This file will be removed.")
-                executor.submit(os.remove, path)
+                self.executor.submit(os.remove, path)
 
-    def _convert_folder(self, items: Iterable[Item], folder_path: Path, executor: ThreadPoolExecutor):
+    def _convert_folder(self, items: Iterable[Item], folder_path: Path):
+        for items_chunk in divide(self.max_threads, items):
+            self.executor.submit(self._convert_folder_chunk, items_chunk, folder_path)
+        return None
+
+    def _convert_folder_chunk(self, items: Iterable[Item], folder_path: Path):
         for item in items:
             converted_path = folder_path / (item.filepath.stem + ".mp3")
             if converted_path.exists():
@@ -219,7 +230,7 @@ class CDManPlugin(BeetsPlugin):
                 print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
                 self._convert_file(src_file, dest_file)
 
-            executor.submit(job, item.filepath, converted_path)
+            self.executor.submit(job, item.filepath, converted_path)
         return None
 
     def _convert_file(self, file: Path, dest_file: Path):

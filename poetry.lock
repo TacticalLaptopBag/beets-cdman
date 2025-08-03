@@ -293,6 +293,18 @@ mutagen = ">=1.46"
 test = ["tox"]
 
 [[package]]
+name = "more-itertools"
+version = "10.7.0"
+description = "More routines for operating on iterables, beyond itertools"
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "more_itertools-10.7.0-py3-none-any.whl", hash = "sha256:d43980384673cb07d2f7d2d918c616b30c659c089ee23953f601d6609c67510e"},
+    {file = "more_itertools-10.7.0.tar.gz", hash = "sha256:9fddd5403be01a94b204faadcff459ec3568cf110265d3c54323e1e866ad29d3"},
+]
+
+[[package]]
 name = "musicbrainzngs"
 version = "0.7.1"
 description = "Python bindings for the MusicBrainz NGS and the Cover Art Archive webservices"
@@ -519,4 +531,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4"
-content-hash = "e23d65db7e7e0c1a0d7e8af5b1a9ecb245d40ef44e041a490899ceb48fde1ab0"
+content-hash = "9b05b4ce149652c099f0e707d16cd645e847ff316dfbbf1cb97dec8b1755a850"
