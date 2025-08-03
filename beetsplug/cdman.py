@@ -333,6 +333,7 @@ class CDManPlugin(BeetsPlugin):
                 cd_splits = cd.get_splits()
                 print(
                     f"WARNING: {size_warning} "
+                    "This will not fit on a traditional CD. "
                     f"However, you could split the CD into {len(cd_splits)} CDs, "
                     "if you divide the CD into chunks starting with these files:"
                 )
