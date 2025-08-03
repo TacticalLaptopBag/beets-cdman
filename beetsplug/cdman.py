@@ -280,8 +280,6 @@ class CDManPlugin(BeetsPlugin):
 
     def _convert_folder(self, items: Iterable[Item], folder_path: Path):
         for items_chunk in divide(self.max_threads, items):
-            # Threaded runs: 6.446, 6.626, 6.437
-            # Non-threaded runs: 31.951, 31.989, 31.904
             self.executor.submit(self._convert_folder_chunk, items_chunk, folder_path)
         return None
 
