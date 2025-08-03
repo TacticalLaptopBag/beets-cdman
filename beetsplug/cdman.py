@@ -121,8 +121,6 @@ class CDManPlugin(BeetsPlugin):
         if self.max_threads <= 0:
             raise ValueError("Config field 'threads' must be a positive integer!")
 
-        self.executor = DimensionalThreadPoolExecutor(self.max_threads)
-
     def commands(self):
         return [self._get_subcommand()]
 
@@ -163,6 +161,8 @@ class CDManPlugin(BeetsPlugin):
         return cmd
 
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
+        self.executor = DimensionalThreadPoolExecutor(self.max_threads)
+        
         cds: list[CD]
         if len(args) == 0:
             cds = self._load_cds_from_config()
