@@ -5,6 +5,9 @@ You can define MP3 CDs in your beets config or with a
 [CD definition file][cd-def-example],
 and easily add, remove, or reorder folders.
 
+`cdman` can't burn CDs, but this can be done by other software such as
+[Brasero][brasero-page] on GNOME, or [K3b][k3b-page] on KDE.
+
 
 - [beets-cdman](#beets-cdman)
   - [Install](#install)
@@ -116,3 +119,5 @@ You can find an example CD definition file [here][cd-def-example]
 [beets-docs]: https://beets.readthedocs.io/en/latest/index.html
 [cd-def-example]: https://github.com/TacticalLaptopBag/beets-cdman/blob/main/example-cdman-definition.yml
 [beets-alt-plugin]: https://github.com/geigerzaehler/beets-alternatives/
+[brasero-page]: https://wiki.gnome.org/Apps/Brasero/
+[k3b-page]: https://apps.kde.org/k3b/
