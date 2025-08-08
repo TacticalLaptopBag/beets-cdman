@@ -42,6 +42,10 @@ class DimensionalThreadPoolExecutor:
         for _ in range(self._max_workers):
             self._executor.submit(self._task_loop)
 
+    @property
+    def max_workers(self) -> int:
+        return self._max_workers
+
     def submit(self, fn: Callable, /, *args, **kwargs):
         self._tasks.put_nowait(_Task(fn, args, kwargs))
 
