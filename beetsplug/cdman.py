@@ -1,25 +1,18 @@
-import math
-import sys
-import shutil
-import os
 import psutil
-import subprocess
-from typing import Iterable
 from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item
+from beets.library import Library
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
 from confuse import RootView, YamlSource
-from more_itertools import divide
 
 from .dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 
 from .cd.cd_folder import CDFolder
-from .util import get_song_length, item_to_track_listing
+from .util import item_to_track_listing
 
-from .cd.cd import CD, MAX_SIZE_AUDIO
-from .cd.mp3_cd import MAX_SIZE_MP3, MP3CD, MP3CDDefinition
+from .cd.cd import CD
+from .cd.mp3_cd import MP3CD, MP3CDDefinition
 
 
 """
