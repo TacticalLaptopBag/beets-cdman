@@ -15,11 +15,11 @@ from more_itertools import divide
 
 from .dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 
-from .cd_folder import CDFolder
-from .cd_type import CDType
-from .util import get_song_length
+from .cd.cd_folder import CDFolder
+from .util import get_song_length, item_to_track_listing
 
-from .cd import CD, MAX_SIZE_AUDIO, MAX_SIZE_MP3, CDDefinition
+from .cd.cd import CD, MAX_SIZE_AUDIO
+from .cd.mp3_cd import MAX_SIZE_MP3, MP3CD, MP3CDDefinition
 
 
 """
@@ -53,7 +53,7 @@ class CDManPlugin(BeetsPlugin):
         })
 
         self.cds_path = Path(self.config["cds_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
-        self.bitrate = self.config["bitrate"].get(int)
+        self.bitrate: int = self.config["bitrate"].get(int) # pyright: ignore[reportAttributeAccessIssue]
         self.max_threads: int = self.config["threads"].get(int) # pyright: ignore[reportAttributeAccessIssue]
         if self.max_threads <= 0:
             raise ValueError("Config field 'threads' must be a positive integer!")
@@ -98,6 +98,16 @@ class CDManPlugin(BeetsPlugin):
         return cmd
 
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
+        if opts.threads is not None:
+            print(f"Overriding config value 'threads': using {opts.threads} instead of {self.max_threads}")
+            self.max_threads = opts.threads
+
+        if opts.bitrate is not None:
+            print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
+            self.bitrate = opts.bitrate
+
+        self.dry = opts.dry
+
         self.executor = DimensionalThreadPoolExecutor(self.max_threads)
         
         cds: list[CD]
@@ -111,16 +121,6 @@ class CDManPlugin(BeetsPlugin):
                     print(f"No such file or directory: {arg_path}")
                     continue
                 cds.extend(self._load_cds_from_path(Path(arg)))
-        
-        if opts.threads is not None:
-            print(f"Overriding config value 'threads': using {opts.threads} instead of {self.max_threads}")
-            self.max_threads = opts.threads
-
-        if opts.bitrate is not None:
-            print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
-            self.bitrate = opts.bitrate
-
-        self.dry = opts.dry
 
         if opts.list_unused:
             self._list_unused(cds, lib)
@@ -132,21 +132,11 @@ class CDManPlugin(BeetsPlugin):
 
         return None
 
-    def _item_to_track_listing(self, item: Item) -> str:
-        return f"{item.get("artist")} - {item.get("album")} - {item.get("title")}"
-
     def _list_unused(self, cds: list[CD], lib: Library):
-        unused_tracks = set([self._item_to_track_listing(item) for item in lib.items()])
-        removed_tracks: set[str] = set()
+        unused_tracks = set([item_to_track_listing(item) for item in lib.items()])
         for cd in cds:
-            for folder in cd.folders:
-                folder_query, _ = parse_query_string(folder.query, Item)
-                folder_items = lib.items(folder_query)
-                for item in folder_items:
-                    track = self._item_to_track_listing(item)
-                    if track not in removed_tracks:
-                        unused_tracks.remove(track)
-                        removed_tracks.add(track)
+            cd_used_tracks = cd.get_used_tracks(lib)
+            unused_tracks = unused_tracks.difference(cd_used_tracks)
             
         if len(unused_tracks) == 0:
             print("No track has been left untouched.")
@@ -161,107 +151,10 @@ class CDManPlugin(BeetsPlugin):
         for cd in cds:
             # Find removed or reordered folders
             if cd.path.exists():
-                for existing_path in cd.path.iterdir():
-                    if not existing_path.is_dir():
-                        continue
-
-                    # Existing CD folder found.
-                    new_path = cd.find_folder_path(existing_path.name)
-                    if new_path == existing_path:
-                        # Folder has not been removed or reordered
-                        continue
-
-                    if new_path is None:
-                        # Folder was not found in CD, must have been removed
-                        print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
-                        self.executor.submit(shutil.rmtree, existing_path)
-                        continue
-
-                    # Folder was found in CD, but at a different position
-                    print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
-                    self.executor.submit(os.rename, existing_path, new_path)
+                cd.cleanup(self.executor)
 
             # Convert
-            for i, folder in enumerate(cd.folders):
-                query, _ = parse_query_string(folder.query, Item)
-                folder_path = folder.get_path(i, cd.path, len(cd.folders))
-                folder_path.mkdir(parents=True, exist_ok=True)
-                items = lib.items(query)
-                self._clean_folder(items, folder_path)
-                self._convert_folder(items, folder_path)
-        return None
-
-    def _clean_folder(self, items: Iterable[Item], folder_path: Path):
-        converted_paths: list[Path] = [folder_path / (item.filepath.stem + ".mp3") for item in items]
-
-        for path in folder_path.iterdir():
-            if path.suffix != ".mp3":
-                continue
-            if not path.is_file():
-                continue
-
-            if path not in converted_paths:
-                print(f"Found removed file `{path}`. This file will be removed.")
-                self.executor.submit(os.remove, path)
-
-    def _convert_folder(self, items: Iterable[Item], folder_path: Path):
-        for items_chunk in divide(self.max_threads, items):
-            self.executor.submit(self._convert_folder_chunk, items_chunk, folder_path)
-        return None
-
-    def _convert_folder_chunk(self, items: Iterable[Item], folder_path: Path):
-        for item in items:
-            converted_path = folder_path / (item.filepath.stem + ".mp3")
-            if converted_path.exists():
-                if converted_path.is_file():
-                    converted_duration = math.ceil(get_song_length(converted_path))
-                    orig_duration = math.ceil(get_song_length(item.filepath))
-                    if abs(converted_duration - orig_duration) > 1:
-                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
-                        os.remove(converted_path)
-                    else:
-                        print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
-                        continue
-                else:
-                    print(f"FATAL: {converted_path} already exists, but it isn't a file!")
-                    print("Unsure how to proceed, you should probably manually intervene here.")
-                    exit(1)
-
-            def job(src_file: Path, dest_file: Path):
-                print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
-                self._convert_file(src_file, dest_file)
-
-            self.executor.submit(job, item.filepath, converted_path)
-        return None
-
-    def _convert_file(self, file: Path, dest_file: Path):
-        # TODO: convert plugin? 🥺👉👈
-        # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
-        if self.dry:
-            return None
-        
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-i", str(file),
-                "-hide_banner",
-                "-acodec", "libmp3lame",
-                "-ar", "44100",
-                "-b:a", f"{self.bitrate}k",
-                "-vn", str(dest_file)
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if result.returncode != 0:
-            sys.stderr.write(f"Error converting `{file}`! Look in `{dest_file.parent}` for ffmpeg logs.\n")
-            stdout_log_path = dest_file.with_suffix(".stdout.log")
-            stderr_log_path = dest_file.with_suffix(".stderr.log")
-            with stdout_log_path.open("wb") as stdout_log:
-                stdout_log.write(result.stdout)
-            with stderr_log_path.open("wb") as stderr_log:
-                stderr_log.write(result.stderr)
-
+            cd.convert(lib, self.executor)
         return None
 
     def _load_cds_from_config(self) -> list[CD]:
@@ -273,7 +166,7 @@ class CDManPlugin(BeetsPlugin):
             )
             return []
 
-        conf_cds: CDDefinition = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
+        conf_cds: MP3CDDefinition = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
         cds = self._load_cds(conf_cds)
         return cds
     
@@ -291,18 +184,18 @@ class CDManPlugin(BeetsPlugin):
 
         try:
             config = RootView([YamlSource(str(path))])
-            cds_dict: CDDefinition = config.get(dict) # pyright: ignore[reportAssignmentType]
+            cds_dict: MP3CDDefinition = config.get(dict) # pyright: ignore[reportAssignmentType]
             cds = self._load_cds(cds_dict)
             return cds
         except:
             print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
             return []
     
-    def _load_cds(self, cd_data: CDDefinition) -> list[CD]:
+    def _load_cds(self, cd_data: MP3CDDefinition) -> list[CD]:
         cds: list[CD] = []
 
         for cd_name in cd_data:
-            cd = CD(self.cds_path / cd_name, CDType.MP3)
+            cd = MP3CD(self.cds_path / cd_name, self.bitrate, self.dry)
             cd_folders_data = cd_data[cd_name]
             for cd_folder_data in cd_folders_data:
                 cd_folder = CDFolder(cd_folder_data)
@@ -313,30 +206,15 @@ class CDManPlugin(BeetsPlugin):
 
     def _report_size(self, cds: list[CD]):
         for cd in cds:
-            cd_size = cd.get_size()
-            size_warning: str
-            cd_max_size: int
-            if cd.type == CDType.MP3:
-                cd_max_size = MAX_SIZE_MP3
-                size_warning = (
-                    f"MP3 CD {cd.path.name} is {cd_size / 1_000_000:.1f} MB, "
-                    f"which is larger than {cd_max_size / 1_000_000} MB!"
-                )
-            else:
-                cd_max_size = MAX_SIZE_AUDIO
-                size_warning = (
-                    f"Audio CD {cd.path.name} is {cd_size / 60:.1f} minutes long, "
-                    f"which is longer than {cd_max_size / 60} minutes!"
-                )
-
-            if cd_size > cd_max_size:
-                print()
-                cd_splits = cd.get_splits()
-                print(
-                    f"WARNING: {size_warning} "
-                    "This will not fit on a traditional CD. "
-                    f"However, you could split the CD into {len(cd_splits)} CDs, "
-                    "if you divide the CD into chunks starting with these files:"
-                )
-                for split in cd_splits:
-                    print(split)
+            if not cd.is_exceeding_size():
+                continue
+            print()
+            cd_splits = cd.get_splits()
+            print(
+                f"WARNING: {cd.size_warning} "
+                "This will not fit on a traditional CD. "
+                f"However, you could split the CD into {len(cd_splits)} CDs, "
+                "if you divide the CD into chunks starting with these files:"
+            )
+            for split in cd_splits:
+                print(split)
