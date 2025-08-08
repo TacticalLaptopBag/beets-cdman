@@ -1,6 +1,7 @@
 from pathlib import Path
-
 import ffmpeg
+
+from beets.library import Item
 
 
 def get_song_length(path: Path) -> float:
@@ -33,3 +34,5 @@ def get_directory_audio_length(directory: Path) -> float:
     durations = [get_song_length(audio_file) for audio_file in audio_files]
     return sum(durations)
 
+def item_to_track_listing(item: Item) -> str:
+    return f"{item.get("artist")} - {item.get("album")} - {item.get("title")}"
