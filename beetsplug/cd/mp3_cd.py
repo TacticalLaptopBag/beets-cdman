@@ -14,7 +14,7 @@ from ..util import get_directory_size, get_song_length
 from .cd import CD
 from .cd_folder import CDFolder
 
-MAX_SIZE_MP3 = 700 * 1024 * 1024
+MAX_SIZE_MP3 = 700_000_000
 
 MP3CDDefinition = dict[str, list[dict[str, str]]]
 
@@ -38,8 +38,8 @@ class MP3CD(CD):
     @override
     def size_warning(self) -> str:
         return (
-            f"MP3 CD {self.path.name} is {self.get_size() / 1024 / 1024:.1f} MiB, "
-            f"which is larger than {MAX_SIZE_MP3 / 1024 / 1024} MiB!"
+            f"MP3 CD {self.path.name} is {self.get_size() / 1_000_000:.1f} MB, "
+            f"which is larger than {MAX_SIZE_MP3 / 1_000_000} MB!"
         )
 
     def find_folder_path(self, dirname: str) -> Optional[Path]:
