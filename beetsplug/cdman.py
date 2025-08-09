@@ -105,7 +105,7 @@ class CDManPlugin(BeetsPlugin):
         
         cds: list[CD]
         if len(args) == 0:
-            cds = self._load_cds_from_config()
+            cds = self._load_cds_from_config(lib)
         else:
             cds = []
             for arg in args:
@@ -113,7 +113,7 @@ class CDManPlugin(BeetsPlugin):
                 if not arg_path.exists():
                     print(f"No such file or directory: {arg_path}")
                     continue
-                cds.extend(self._load_cds_from_path(Path(arg)))
+                cds.extend(self._load_cds_from_path(lib, Path(arg)))
 
         if opts.list_unused:
             self._list_unused(cds, lib)
@@ -128,7 +128,7 @@ class CDManPlugin(BeetsPlugin):
     def _list_unused(self, cds: list[CD], lib: Library):
         unused_tracks = set([item_to_track_listing(item) for item in lib.items()])
         for cd in cds:
-            cd_used_tracks = cd.get_used_tracks(lib)
+            cd_used_tracks = cd.get_used_tracks()
             unused_tracks = unused_tracks.difference(cd_used_tracks)
             
         if len(unused_tracks) == 0:
@@ -147,10 +147,10 @@ class CDManPlugin(BeetsPlugin):
                 cd.cleanup(self.executor)
 
             # Convert
-            cd.convert(lib, self.executor)
+            cd.convert(self.executor)
         return None
 
-    def _load_cds_from_config(self) -> list[CD]:
+    def _load_cds_from_config(self, lib: Library) -> list[CD]:
         if "cds" not in self.config:
             print(
                 "No CDs defined in config! "
@@ -160,14 +160,14 @@ class CDManPlugin(BeetsPlugin):
             return []
 
         conf_cds: MP3CDDefinition = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
-        cds = self._load_cds(conf_cds)
+        cds = self._load_cds(lib, conf_cds)
         return cds
     
-    def _load_cds_from_path(self, path: Path) -> list[CD]:
+    def _load_cds_from_path(self, lib: Library, path: Path) -> list[CD]:
         if path.is_dir():
             child_cds: list[CD] = []
             for child in path.iterdir():
-                child_cds.extend(self._load_cds_from_path(child))
+                child_cds.extend(self._load_cds_from_path(lib, child))
             return child_cds
 
         if not path.is_file():
@@ -178,17 +178,17 @@ class CDManPlugin(BeetsPlugin):
         try:
             config = RootView([YamlSource(str(path))])
             cds_dict: MP3CDDefinition = config.get(dict) # pyright: ignore[reportAssignmentType]
-            cds = self._load_cds(cds_dict)
+            cds = self._load_cds(lib, cds_dict)
             return cds
         except:
             print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
             return []
     
-    def _load_cds(self, cd_data: MP3CDDefinition) -> list[CD]:
+    def _load_cds(self, lib: Library, cd_data: MP3CDDefinition) -> list[CD]:
         cds: list[CD] = []
 
         for cd_name in cd_data:
-            cd = MP3CD(self.cds_path / cd_name, self.bitrate, self.dry)
+            cd = MP3CD(lib, self.cds_path / cd_name, self.dry, self.bitrate)
             cd_folders_data = cd_data[cd_name]
             for cd_folder_data in cd_folders_data:
                 cd_folder = CDFolder(cd_folder_data)

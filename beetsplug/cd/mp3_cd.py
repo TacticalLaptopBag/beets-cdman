@@ -9,20 +9,19 @@ from typing import Iterable, Optional, override
 from beets.library import Library, parse_query_string, Item
 from more_itertools import divide
 
-from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
-
-from ..util import get_all_files, get_directory_size, get_song_length, item_to_track_listing
+from ..dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from ..util import get_directory_size, get_song_length
 from .cd import CD
 from .cd_folder import CDFolder
 
-MAX_SIZE_MP3 = 700_000_000
+MAX_SIZE_MP3 = 700 * 1024 * 1024
 
 MP3CDDefinition = dict[str, list[dict[str, str]]]
 
 
 class MP3CD(CD):
-    def __init__(self, path: Path, bitrate: int, dry: bool):
-        super().__init__(path)
+    def __init__(self, lib: Library, path: Path, dry: bool, bitrate: int):
+        super().__init__(lib, path, dry)
         self.folders: list[CDFolder] = []
         self.bitrate = bitrate
         self.dry = dry
@@ -39,8 +38,8 @@ class MP3CD(CD):
     @override
     def size_warning(self) -> str:
         return (
-            f"MP3 CD {self.path.name} is {self.get_size() / 1_000_000:.1f} MB, "
-            f"which is larger than {MAX_SIZE_MP3 / 1_000_000} MB!"
+            f"MP3 CD {self.path.name} is {self.get_size() / 1024 / 1024:.1f} MiB, "
+            f"which is larger than {MAX_SIZE_MP3 / 1024 / 1024} MiB!"
         )
 
     def find_folder_path(self, dirname: str) -> Optional[Path]:
@@ -96,39 +95,16 @@ class MP3CD(CD):
         return get_directory_size(self.path)
 
     @override
-    def is_exceeding_size(self) -> bool:
-        size = self.get_size()
-        return size > MAX_SIZE_MP3
+    def _get_track_size(self, file: Path) -> int | float:
+        return file.stat().st_size
 
     @override
-    def get_splits(self) -> list[Path]:
-        files = get_all_files(self.path)
-        splits: list[Path] = []
-        sum = 0
-        
-        for file in files:
-            file_size = 0
-            max_size: int
-            file_size = file.stat().st_size
-            max_size = MAX_SIZE_MP3
-                
-            sum += file_size
-            if sum >= max_size:
-                splits.append(file)
-                sum = file_size
-        
-        return splits
+    def _get_max_size(self) -> int | float:
+        return MAX_SIZE_MP3
 
     @override
-    def get_used_tracks(self, lib: Library) -> set[str]:
-        used_tracks = set[str]()
-        for folder in self.folders:
-            folder_query, _ = parse_query_string(folder.query, Item)
-            folder_items = lib.items(folder_query)
-            for item in folder_items:
-                track = item_to_track_listing(item)
-                used_tracks.add(track)
-        return used_tracks
+    def _get_queries(self) -> list[str]:
+        return [folder.query for folder in self.folders]
 
     @override
     def cleanup(self, executor: DimensionalThreadPoolExecutor):
@@ -154,12 +130,12 @@ class MP3CD(CD):
         return None
 
     @override
-    def convert(self, lib: Library, executor: DimensionalThreadPoolExecutor):
+    def convert(self, executor: DimensionalThreadPoolExecutor):
         for i, folder in enumerate(self.folders):
             query, _ = parse_query_string(folder.query, Item)
             folder_path = folder.get_path(i, self.path, len(self.folders))
             folder_path.mkdir(parents=True, exist_ok=True)
-            items = lib.items(query)
+            items = self.lib.items(query)
             self._clean_folder(items, folder_path, executor)
             self._convert_folder(items, folder_path, executor)
         return None
