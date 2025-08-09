@@ -4,18 +4,27 @@
 
 # The structure is simple, and exactly the same as the `cds` config field:
 # cd-name:
-#   - name: First Folder Name
-#     query: "'album:Album Name'"
-#   - name: Second Folder Name
-#     query: "'other query' 'anded with first part of this query'"
+#   type: mp3
+#   folders:
+#     - name: First Folder Name
+#       query: "'album:Album Name'"
+#     - name: Second Folder Name
+#       query: "'other query' 'anded with first part of this query'"
+# second-cd-name:
+#   type: audio
+#   track_queries:
+#     - "'first tracks'"
+#     - "'next tracks'"
 
 ori:
-  - name: Blind Forest
-    query: "'album:Ori and the Blind Forest'"
-  - name: Will of the Wisps
-    query: "'album:Ori and the Will of the Wisps'"
-portal:
-  - name: Portal 2
-    query: "'album:Portal 2'"
-  - name: "Portal Stories: Mel" # Wrapped in quotes because of the colon
-    query: "'album:Portal Stories Mel'"
+  type: mp3
+  folders:
+    - name: Blind Forest
+      query: "'album:Ori and the Blind Forest'"
+    - name: Will of the Wisps
+      query: "'album:Ori and the Will of the Wisps'"
+discovery:
+  type: audio
+  track_queries:
+    - "'artist:Daft Punk' 'album:Discovery'"
+    - "'artist:Daft Punk' 'album:Daft Club' 'Aerodynamic'"
