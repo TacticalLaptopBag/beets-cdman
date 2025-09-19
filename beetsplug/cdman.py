@@ -3,19 +3,30 @@ import sys
 import shutil
 import os
 import re
+from threading import Thread
 import psutil
 import subprocess
 import ffmpeg
 from typing import Iterable, Optional
 from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item, Results
+from beets.library import Library, parse_query_string, Item
 from beets.ui import Subcommand
 from optparse import Values
 from pathlib import Path
 from confuse import RootView, YamlSource
 from more_itertools import divide
 
+from beetsplug.printer import Printer
+from beetsplug.stats import Stats
+
 from .dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+
+
+verbose = False
+
+def log(*values: object):
+    if not verbose: return
+    print(*values)
 
 
 """
@@ -116,10 +127,33 @@ class CDManPlugin(BeetsPlugin):
             "threads": hw_thread_count,
         })
 
+        self.stats = Stats()
+        self.summary_thread = Thread(
+            target=self.summary_thread_function,
+            name="Summary",
+        )
+        
         self.bitrate = self.config["bitrate"].get(int)
         self.max_threads: int = self.config["threads"].get(int) # pyright: ignore[reportAttributeAccessIssue]
         if self.max_threads <= 0:
             raise ValueError("Config field 'threads' must be a positive integer!")
+
+    def summary_thread_function(self):
+        p = Printer()
+        while True:
+            with self.stats.changed_cond:
+                self.stats.changed_cond.wait()
+
+            with self.stats.lock:
+                if verbose and not self.stats.done:
+                    continue
+                p.print_line(0, f"Tracks converted: {self.stats.convert_count}")
+                p.print_line(1, f"Tracks skipped: {self.stats.skip_count}")
+                p.print_line(2, f"Tracks deleted: {self.stats.removed_count}")
+                p.print_line(3, f"Folders moved: {self.stats.folders_moved_count}")
+                p.print_line(4, f"Failed conversions: {self.stats.failed_convert_count}")
+                if self.stats.done:
+                    break
 
     def commands(self):
         return [self._get_subcommand()]
@@ -155,6 +189,12 @@ class CDManPlugin(BeetsPlugin):
                 "Lists all tracks in your library that are not in any CD definitions.",
             action="store_true",
         )
+        cmd.parser.add_option(
+            "--verbose", "-v",
+            help = 
+                "Print extra terminal output",
+            action="store_true", 
+        )
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
         cmd.func = cdman_cmd
@@ -171,17 +211,22 @@ class CDManPlugin(BeetsPlugin):
             for arg in args:
                 arg_path = Path(arg)
                 if not arg_path.exists():
-                    print(f"No such file or directory: {arg_path}")
+                    log(f"No such file or directory: {arg_path}")
                     continue
                 cds.extend(self._load_cds_from_path(Path(arg)))
         
         if opts.threads is not None:
-            print(f"Overriding config value 'threads': using {opts.threads} instead of {self.max_threads}")
+            log(f"Overriding config value 'threads': using {opts.threads} instead of {self.max_threads}")
             self.max_threads = opts.threads
 
         if opts.bitrate is not None:
-            print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
+            log(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
             self.bitrate = opts.bitrate
+
+        global verbose
+        verbose = opts.verbose
+
+        self.summary_thread.start()
 
         self.dry = opts.dry
 
@@ -191,6 +236,10 @@ class CDManPlugin(BeetsPlugin):
             self._populate_cds(cds, lib)
 
         self.executor.shutdown()
+        with self.stats.lock:
+            self.stats.done = True
+        self.stats.notify()
+        self.summary_thread.join()
         return None
 
     def _item_to_track_listing(self, item: Item) -> str:
@@ -210,13 +259,32 @@ class CDManPlugin(BeetsPlugin):
                         removed_tracks.add(track)
             
         if len(unused_tracks) == 0:
-            print("No track has been left untouched.")
+            log("No track has been left untouched.")
             return None
 
-        print("Tracks not in any defined CD:")
+        log("Tracks not in any defined CD:")
         for unused_track in unused_tracks:
-            print(unused_track)
+            log(unused_track)
         return None
+
+    def _rm_folder(self, folder_path: Path):
+        removed_count = len(list(folder_path.iterdir()))
+        shutil.rmtree(folder_path)
+        with self.stats.lock:
+            self.stats.removed_count += removed_count
+        self.stats.notify()
+
+    def _rm_track(self, track_path: Path):
+        os.remove(track_path)
+        with self.stats.lock:
+            self.stats.removed_count += 1
+        self.stats.notify()
+
+    def _rename_folder(self, existing_path: Path, new_path: Path):
+        os.rename(existing_path, new_path)
+        with self.stats.lock:
+            self.stats.folders_moved_count += 1
+        self.stats.notify()
 
     def _populate_cds(self, cds: list[CD], lib: Library):
         for cd in cds:
@@ -234,13 +302,13 @@ class CDManPlugin(BeetsPlugin):
 
                     if new_path is None:
                         # Folder was not found in CD, must have been removed
-                        print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
-                        self.executor.submit(shutil.rmtree, existing_path)
+                        log(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
+                        self.executor.submit(self._rm_folder, existing_path)
                         continue
 
                     # Folder was found in CD, but at a different position
-                    print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
-                    self.executor.submit(os.rename, existing_path, new_path)
+                    log(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
+                    self.executor.submit(self._rename_folder, existing_path, new_path)
 
             # Convert
             for i, folder in enumerate(cd.folders):
@@ -275,8 +343,8 @@ class CDManPlugin(BeetsPlugin):
                 continue
 
             if path not in converted_paths:
-                print(f"Found removed file `{path}`. This file will be removed.")
-                self.executor.submit(os.remove, path)
+                log(f"Found removed file `{path}`. This file will be removed.")
+                self.executor.submit(self._rm_track, path)
 
     def _convert_folder(self, items: Iterable[Item], folder_path: Path):
         for items_chunk in divide(self.max_threads, items):
@@ -291,18 +359,21 @@ class CDManPlugin(BeetsPlugin):
                     converted_duration = math.ceil(self._get_song_length(converted_path))
                     orig_duration = math.ceil(self._get_song_length(item.filepath))
                     if abs(converted_duration - orig_duration) > 1:
-                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
+                        log(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
                         os.remove(converted_path)
                     else:
-                        print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
+                        log(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
+                        with self.stats.lock:
+                            self.stats.skip_count += 1
+                        self.stats.notify()
                         continue
                 else:
-                    print(f"FATAL: {converted_path} already exists, but it isn't a file!")
-                    print("Unsure how to proceed, you should probably manually intervene here.")
+                    log(f"FATAL: {converted_path} already exists, but it isn't a file!")
+                    log("Unsure how to proceed, you should probably manually intervene here.")
                     exit(1)
 
             def job(src_file: Path, dest_file: Path):
-                print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
+                log(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
                 self._convert_file(src_file, dest_file)
 
             self.executor.submit(job, item.filepath, converted_path)
@@ -328,19 +399,27 @@ class CDManPlugin(BeetsPlugin):
             stderr=subprocess.PIPE,
         )
         if result.returncode != 0:
-            sys.stderr.write(f"Error converting `{file}`! Look in `{dest_file.parent}` for ffmpeg logs.\n")
+            if verbose:
+                sys.stderr.write(f"Error converting `{file}`! Look in `{dest_file.parent}` for ffmpeg logs.\n")
             stdout_log_path = dest_file.with_suffix(".stdout.log")
             stderr_log_path = dest_file.with_suffix(".stderr.log")
             with stdout_log_path.open("wb") as stdout_log:
                 stdout_log.write(result.stdout)
             with stderr_log_path.open("wb") as stderr_log:
                 stderr_log.write(result.stderr)
+            with self.stats.lock:
+                self.stats.failed_convert_count += 1
+            self.stats.notify()
+        else:
+            with self.stats.lock:
+                self.stats.convert_count += 1
+            self.stats.notify()
 
         return None
 
     def _load_cds_from_config(self) -> list[CD]:
         if "cds" not in self.config:
-            print(
+            log(
                 "No CDs defined in config! "
                 "Either add CDs in your beets config file or create "
                 "CD definition files and pass them as arguments."
@@ -369,7 +448,7 @@ class CDManPlugin(BeetsPlugin):
             cds = self._load_cds(cds_dict)
             return cds
         except:
-            print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
+            log(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
             return []
     
     def _load_cds(self, cd_data: CDDefinition) -> list[CD]:
