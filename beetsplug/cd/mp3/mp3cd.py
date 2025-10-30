@@ -2,6 +2,8 @@ from pathlib import Path
 import shutil
 from typing import override
 
+from beetsplug.cd.track import CDTrack
+
 from ...stats import Stats
 from ...config import Config
 from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
@@ -9,8 +11,8 @@ from ...util import unnumber_name
 from ..cd import CD
 from .folder import MP3Folder
 
-
 # TODO: __root__ folder should go to CD root!
+
 
 def _rmdir_job(path: Path):
     if Config.verbose:
@@ -39,6 +41,10 @@ class MP3CD(CD):
     ) -> None:
         super().__init__(path, executor)
         self._folders = folders
+
+    @CD.max_size.getter
+    def max_size(self) -> float:
+        return 700_000_000
 
     @override
     def cleanup(self):

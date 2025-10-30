@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import override
 from more_itertools import divide
 
+from beetsplug.cd.track import CDTrack
+
 from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from ..cd import CD
 from .audiotrack import AudioTrack
@@ -17,6 +19,10 @@ class AudioCD(CD):
         super().__init__(path, executor)
         self._tracks = tracks
         self._executor = executor
+
+    @CD.max_size.getter
+    def max_size(self) -> float:
+        return 80 * 60
 
     @override
     def cleanup(self):

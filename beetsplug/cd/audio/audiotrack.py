@@ -1,3 +1,4 @@
+import math
 import os
 from pathlib import Path
 import shutil
@@ -70,4 +71,8 @@ class AudioTrack(CDTrack):
             Stats.track_populated()
         except OSError:
             Stats.track_failed()
+
+    @override
+    def __len__(self):
+        return math.ceil(self.get_duration(self.dst_path))
 

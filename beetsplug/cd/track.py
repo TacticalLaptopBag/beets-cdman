@@ -76,3 +76,7 @@ class CDTrack(ABC):
     def populate(self):
         pass
 
+    @abstractmethod
+    def __len__(self):
+        raise RuntimeError("__len__ is not overridden!")
+

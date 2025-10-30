@@ -65,3 +65,7 @@ class MP3Track(CDTrack):
             Stats.track_populated()
 
         return None
+
+    @override
+    def __len__(self):
+        return self.get_size()

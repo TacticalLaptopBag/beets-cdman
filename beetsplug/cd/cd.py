@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 import os
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 from magic import Magic
 from more_itertools import divide
 
@@ -12,8 +12,6 @@ from ..dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from ..util import unnumber_name
 from .track import CDTrack
 
-
-# TODO: Calculate splits
 
 def _rm_job(path: Path):
     if Config.verbose:
@@ -42,6 +40,10 @@ class CD(ABC):
     @property
     def path(self) -> Path:
         return self._path
+
+    @property
+    def max_size(self) -> float:
+        raise RuntimeError("max_size is not overridden!")
 
     @abstractmethod
     def cleanup(self):
@@ -93,3 +95,27 @@ class CD(ABC):
     @abstractmethod
     def numberize(self):
         pass
+
+    def calculate_splits(self) -> Sequence[tuple[CDTrack, CDTrack]]:
+        splits: list[tuple[CDTrack, CDTrack]] = []
+        tracks = self.get_tracks()
+
+        start_track: Optional[CDTrack] = None
+        last_track: Optional[CDTrack] = None
+        split_size = 0.0
+        for track in tracks:
+            if start_track is None:
+                start_track = track
+            if last_track is None:
+                last_track = track
+
+            track_size = len(track)
+            if split_size + track_size > self.max_size:
+                splits.append((start_track, last_track))
+                start_track = track
+                split_size = track_size
+            else:
+                split_size += track_size
+                
+            last_track = track
+        return splits
