@@ -1,86 +1,95 @@
-import re
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
+import os
 from pathlib import Path
-from typing import Optional, final
-from beets.library import Library, parse_query_string, Item
+from typing import Iterator
+from magic import Magic
+from more_itertools import divide
 
-from ..util import get_all_files, item_to_track_listing
+from ..stats import Stats
+from ..config import Config
 from ..dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from ..util import unnumber_name
+from .track import CDTrack
 
 
-MAX_SIZE_AUDIO = 4_800
+# TODO: Calculate splits
+
+def _rm_job(path: Path):
+    if Config.verbose:
+        print(f"Removed track {path}")
+
+    if not Config.dry:
+        os.remove(path)
+    Stats.track_removed()
+
+
+def _mv_job(src_path: Path, dst_path: Path):
+    if Config.verbose:
+        print(f"Existing track moved from {src_path} to {dst_path}")
+    
+    if not Config.dry:
+        src_path.rename(dst_path)
+    Stats.track_moved()
 
 
 class CD(ABC):
-    def __init__(self, lib: Library, path: Path, dry: bool):
-        self.lib = lib
-        self.path = path
-        self.dry = dry
+    def __init__(self, path: Path, executor: DimensionalThreadPoolExecutor) -> None:
+        super().__init__()
+        self._path = path
+        self._executor = executor
 
     @property
-    @abstractmethod
-    def size_warning(self) -> str:
-        pass
+    def path(self) -> Path:
+        return self._path
 
     @abstractmethod
-    def get_size(self) -> int | float:
+    def cleanup(self):
         pass
 
-    def is_exceeding_size(self) -> bool:
-        size = self.get_size()
-        return size > self._get_max_size()
+    def _cleanup_path(self, path: Path, tracks: Sequence[CDTrack]):
+        for existing_path in path.iterdir():
+            if not existing_path.is_file():
+                continue
+            
+            mimetype = Magic(mime=True).from_file(existing_path)
+            if not mimetype.startswith("audio/"):
+                continue
 
-    def get_splits(self) -> list[Path]:
-        files = get_all_files(self.path)
-        splits: list[Path] = []
-        sum = 0
-        
-        for file in files:
-            file_size = 0
-            file_size = self._get_track_size(file)
-            max_size = self._get_max_size()
-                
-            sum += file_size
-            if sum >= max_size:
-                splits.append(file)
-                sum = file_size
-        
-        return splits
+            existing_track_name = unnumber_name(existing_path.name)
+            existing_track = next((track for track in tracks if track.name == existing_track_name), None)
+            if existing_track is None:
+                # Track is no longer in CD
+                self._executor.submit(_rm_job, existing_path)
+                continue
 
-    @abstractmethod
-    def _get_track_size(self, file: Path) -> int | float:
-        pass
-
-    @abstractmethod
-    def _get_max_size(self) -> int | float:
-        pass
-
-    @abstractmethod
-    def _get_queries(self) -> list[str]:
-        pass
-
-    def get_used_tracks(self) -> set[str]:
-        used_tracks = set[str]()
-        for query_str in self._get_queries():
-            query, _ = parse_query_string(query_str, Item)
-            items = self.lib.items(query)
-            for item in items:
-                track = item_to_track_listing(item)
-                used_tracks.add(track)
-        return used_tracks
-
-    @abstractmethod
-    def cleanup(self, executor: DimensionalThreadPoolExecutor):
-        pass
-
-    @abstractmethod
-    def convert(self, executor: DimensionalThreadPoolExecutor):
-        pass
-
-    def find_item_path(self, item_name: str, items: list[str]) -> Optional[Path]:
-        name_regex = r"^\d+\s+(.*$)"
-        name_match = re.match(name_regex, item_name)
-        if name_match is None:
-            # item_name isn't in the expected format
-            return None
+            if existing_track.dst_path == existing_path:
+                # Path remains unchanged
+                continue
+            
+            if existing_track.is_similar(existing_path):
+                # Path changed, and is likely the same song
+                self._executor.submit(_mv_job, existing_path, existing_track.dst_path)
+                continue
+            
+            # Does not appear to be the same song
+            self._executor.submit(_rm_job, existing_path)
     
+    def populate(self):
+        tracks = self.get_tracks()
+        for track_chunk in divide(self._executor.max_workers, tracks):
+            self._executor.submit(self._populate_chunk, track_chunk)
+        return None
+
+    def _populate_chunk(self, chunk: Iterator[CDTrack]):
+        for track in chunk:
+            self._executor.submit(track.populate)
+        return None
+
+    @abstractmethod
+    def get_tracks(self) -> Sequence[CDTrack]:
+        pass
+
+    @abstractmethod
+    def numberize(self):
+        pass
