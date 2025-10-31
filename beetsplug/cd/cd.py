@@ -31,6 +31,17 @@ def _mv_job(src_path: Path, dst_path: Path):
     Stats.track_moved()
 
 
+class CDSplit:
+    def __init__(
+        self,
+        init: CDTrack,
+        size: float = 0.0,
+    ) -> None:
+        self.start = init
+        self.end = init
+        self.size = size
+
+
 class CD(ABC):
     def __init__(self, path: Path, executor: DimensionalThreadPoolExecutor) -> None:
         super().__init__()
@@ -97,27 +108,31 @@ class CD(ABC):
     def numberize(self):
         pass
 
-    def calculate_splits(self) -> Sequence[tuple[CDTrack, CDTrack]]:
-        splits: list[tuple[CDTrack, CDTrack]] = []
+    def calculate_splits(self) -> Sequence[CDSplit]:
+        splits: list[CDSplit] = []
         tracks = self.get_tracks()
+        if len(tracks) == 0:
+            return []
 
-        start_track: Optional[CDTrack] = None
-        last_track: Optional[CDTrack] = None
-        split_size = 0.0
+        next_split = CDSplit(tracks[0])
         max_size = self.max_size if self._test_size < 0 else self._test_size
+        print(f"Using max_size of {max_size}")
         for track in tracks:
-            if start_track is None:
-                start_track = track
-            if last_track is None:
-                last_track = track
-
             track_size = len(track)
-            if split_size + track_size > max_size:
-                splits.append((start_track, last_track))
-                start_track = track
-                split_size = track_size
+            print(f"current split size: {next_split.size}")
+            print(f"Next track {track.name} size: {track_size}")
+
+            if next_split.size + track_size > max_size:
+                print(f"Track is too big, finalize split at {next_split.start.name} - {next_split.end.name}")
+                # Too big for one CD
+                splits.append(next_split)
+                next_split = CDSplit(track, track_size)
             else:
-                split_size += track_size
+                next_split.size += track_size
+                print(f"Add to split, total of {next_split.size}")
                 
-            last_track = track
+            next_split.end = track
+        
+        print(f"Last split ({next_split.size}): {next_split.start.name} - {next_split.end.name}")
+        splits.append(next_split)
         return splits

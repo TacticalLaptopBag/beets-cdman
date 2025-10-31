@@ -101,46 +101,48 @@ def test_cleanup(cds):
 
 
 def test_calculate_splits(cds):
+    cds[0].numberize()
+    cds[0].populate()
+    cds[1].numberize()
+    cds[1].populate()
+    cds[0]._executor.shutdown()
+
     cd = cds[0]
+
     cd._test_size = 208 + 278
-    cd.numberize()
-    cd.populate()
-    cd._executor.shutdown()
     splits = cd.calculate_splits()
-    assert len(splits) == 1
-    assert splits[0][0] == cd._tracks[0]
-    assert splits[0][1] == cd._tracks[1]
+    assert len(splits) == 2
+    assert splits[0].start == cd._tracks[0]
+    assert splits[0].end == cd._tracks[1]
+    assert splits[1].start == cd._tracks[2]
+    assert splits[1].end == cd._tracks[2]
 
     cd._test_size = -1
     splits = cd.calculate_splits()
-    assert len(splits) == 0
+    assert len(splits) == 1
+    assert splits[0].start == cd._tracks[0]
+    assert splits[0].end == cd._tracks[2]
 
-    cd._test_size = 1
+    cd._test_size = 208
     splits = cd.calculate_splits()
     assert len(splits) == 3
-    # Expected `Jul`
-    assert splits[0][0] == cd._tracks[0]
-    # Expected `Jul`
-    assert splits[0][1] == cd._tracks[0]
-    # Expected `Stars In Her Skies`, got `Jul`
-    assert splits[1][0].name == cd._tracks[1].name
-    # Expected `Stars In Her Skies`, got `Jul`
-    assert splits[1][1].name == cd._tracks[1].name
-    # Expected `Chasing Daylight`, got `Stars In Her Skies`
-    assert splits[2][0].name == cd._tracks[2].name
-    # Expected `Chasing Daylight`, got `Stars In Her Skies`
-    assert splits[2][1].name == cd._tracks[2].name
+    assert splits[0].start == cd._tracks[0]
+    assert splits[0].end == cd._tracks[0]
+    assert splits[1].start == cd._tracks[1]
+    assert splits[1].end == cd._tracks[1]
+    assert splits[2].start == cd._tracks[2]
+    assert splits[2].end == cd._tracks[2]
 
     cd = cds[1]
+
     cd._test_size = 249 + 343
-    cd.numberize()
-    cd.populate()
-    cd._executor.shutdown()
     splits = cd.calculate_splits()
-    assert len(splits) == 0
+    assert len(splits) == 1
 
     cd._test_size = 249
     splits = cd.calculate_splits()
-    assert len(splits) == 1
-    assert splits[0][0] == cd._tracks[0]
-    assert splits[0][1] == cd._tracks[1]
+    assert len(splits) == 2
+    assert splits[0].start == cd._tracks[0]
+    assert splits[0].end == cd._tracks[0]
+    assert splits[1].start == cd._tracks[1]
+    assert splits[1].end == cd._tracks[1]
