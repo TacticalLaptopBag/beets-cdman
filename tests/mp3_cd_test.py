@@ -76,27 +76,27 @@ def cds(executor) -> list[MP3CD]:
 
 
 def test_max_size(cds):
-    assert cds[0].max_size == 700_000_000
-    assert cds[1].max_size == 700_000_000
-    cds[0]._executor.shutdown()
+    with cds[0]._executor:
+        assert cds[0].max_size == 700_000_000
+        assert cds[1].max_size == 700_000_000
 
 
 def test_numberize(cds):
-    for cd in cds:
-        cd.numberize()
-        for i, folder in enumerate(cd._folders):
-            assert folder.path.name == f"0{i+1} {folder.name}"
-            for track in folder._tracks:
-                assert track.dst_path is not None
-                assert track.dst_directory == folder.path
-    cds[0]._executor.shutdown()
+    with cds[0]._executor:
+        for cd in cds:
+            cd.numberize()
+            for i, folder in enumerate(cd._folders):
+                assert folder.path.name == f"0{i+1} {folder.name}"
+                for track in folder._tracks:
+                    assert track.dst_path is not None
+                    assert track.dst_directory == folder.path
 
 
 def test_populate(cds):
-    for cd in cds:
-        cd.numberize()
-        cd.populate()
-    cds[0]._executor.shutdown()
+    with cds[0]._executor:
+        for cd in cds:
+            cd.numberize()
+            cd.populate()
 
     for cd in cds:
         for folder in cd._folders:
@@ -105,14 +105,14 @@ def test_populate(cds):
 
 
 def test_get_tracks(cds):
-    for cd in cds:
-        tracks = cd.get_tracks()
-        track_idx = 0
-        for folder in cd._folders:
-            for track in folder._tracks:
-                assert tracks[track_idx] == track
-                track_idx += 1
-    cds[0]._executor.shutdown()
+    with cds[0]._executor:
+        for cd in cds:
+            tracks = cd.get_tracks()
+            track_idx = 0
+            for folder in cd._folders:
+                for track in folder._tracks:
+                    assert tracks[track_idx] == track
+                    track_idx += 1
 
 
 def test_cleanup(cds):
@@ -122,9 +122,9 @@ def test_cleanup(cds):
 
 
 def test_calculate_splits(cds):
-    cds[0].numberize()
-    cds[0].populate()
-    cds[0]._executor.shutdown()
+    with cds[0]._executor:
+        cds[0].numberize()
+        cds[0].populate()
     
     cd = cds[0]
     tracks = cd.get_tracks()
