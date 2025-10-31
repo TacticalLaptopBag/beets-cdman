@@ -107,19 +107,44 @@ def test_cleanup(cds):
 
         # Case 1: Song no longer exists in CD
         track1_path = cd._tracks[0].dst_path
-        shutil.copy2(track1_path, track1_path.with_name("04 Extra Song.m4a"))
+        extra_path = track1_path.with_stem("04 Extra Song")
+        shutil.copy2(track1_path, extra_path)
         cd.cleanup()
         cd._executor.wait()
         assert Stats.tracks_removed == 1
+        assert not extra_path.exists()
         Stats.reset()
 
         # Case 2: Song has changed position
         track2_path = cd._tracks[1].dst_path
         track3_path = cd._tracks[2].dst_path
-        track2_path.rename(track2_path.with_name("03 Stars In Her Skies.mp3"))
-        track3_path.rename(track3_path.with_name("02 Chasing Daylight.opus"))
+        track2_renamed = track2_path.with_stem("03 Stars In Her Skies")
+        track3_renamed = track3_path.with_stem("02 Chasing Daylight")
+        track2_path.rename(track2_renamed)
+        track3_path.rename(track3_renamed)
         cd.cleanup()
+        cd._executor.wait()
         assert Stats.tracks_moved == 2
+        assert track2_path.exists()
+        assert track3_path.exists()
+        assert not track2_renamed.exists()
+        assert not track3_renamed.exists()
+        Stats.reset()
+
+        # Bonus case: All cases combined
+        shutil.copy2(track1_path, extra_path)
+        track2_path.rename(track2_renamed)
+        track3_path.rename(track3_renamed)
+        cd.cleanup()
+        cd._executor.wait()
+        assert Stats.tracks_removed == 1
+        assert Stats.tracks_moved == 2
+        assert not extra_path.exists()
+        assert track2_path.exists()
+        assert track3_path.exists()
+        assert not track2_renamed.exists()
+        assert not track3_renamed.exists()
+
 
 
 def test_calculate_splits(cds):
