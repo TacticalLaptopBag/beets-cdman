@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import math
 from pathlib import Path
-from typing import Optional
+from typing import Optional, override
 import ffmpeg
 
 from ..util import unnumber_name
@@ -75,4 +75,8 @@ class CDTrack(ABC):
     @abstractmethod
     def __len__(self):
         raise RuntimeError("__len__ is not overridden!")
+
+    @override
+    def __str__(self) -> str:
+        return f"CDTrack(name={self.name}, src_path={self.src_path}, dst_path={self.dst_path})"
 
