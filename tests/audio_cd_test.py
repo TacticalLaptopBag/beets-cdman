@@ -25,17 +25,17 @@ def cds(executor) -> list[AudioCD]:
             cd_path / "cd_1",
             [
                 AudioTrack(
-                    music_path / "01 Jul.m4a",
+                    music_path / "01 Jul.m4a", # 207.641338
                     cd_path / "cd_1",
                     AudioPopulateMode.HARD_LINK,
                 ),
                 AudioTrack(
-                    music_path / "3 Stars In Her Skies.mp3",
+                    music_path / "3 Stars In Her Skies.mp3", # 277.263673
                     cd_path / "cd_1",
                     AudioPopulateMode.SOFT_LINK,
                 ),
                 AudioTrack(
-                    music_path / "Chasing Daylight.opus",
+                    music_path / "Chasing Daylight.opus", # 273.864458
                     cd_path / "cd_1",
                     AudioPopulateMode.COPY,
                 ),
@@ -46,12 +46,12 @@ def cds(executor) -> list[AudioCD]:
             cd_path / "cd_2",
             [
                 AudioTrack(
-                    music_path / "002 Snowfall.mp3",
+                    music_path / "002 Snowfall.mp3", # 248.450612
                     cd_path / "cd_2",
                     AudioPopulateMode.HARD_LINK,
                 ),
                 AudioTrack(
-                    music_path / "A Kind Of Hope.ogg",
+                    music_path / "A Kind Of Hope.ogg", # 342.600544
                     cd_path / "cd_2",
                     AudioPopulateMode.SOFT_LINK,
                 ),
@@ -98,3 +98,49 @@ def test_cleanup(cds):
     # TODO: Write this
     cds[0]._executor.shutdown()
     assert False
+
+
+def test_calculate_splits(cds):
+    cd = cds[0]
+    cd._test_size = 208 + 278
+    cd.numberize()
+    cd.populate()
+    cd._executor.shutdown()
+    splits = cd.calculate_splits()
+    assert len(splits) == 1
+    assert splits[0][0] == cd._tracks[0]
+    assert splits[0][1] == cd._tracks[1]
+
+    cd._test_size = -1
+    splits = cd.calculate_splits()
+    assert len(splits) == 0
+
+    cd._test_size = 1
+    splits = cd.calculate_splits()
+    assert len(splits) == 3
+    # Expected `Jul`
+    assert splits[0][0] == cd._tracks[0]
+    # Expected `Jul`
+    assert splits[0][1] == cd._tracks[0]
+    # Expected `Stars In Her Skies`, got `Jul`
+    assert splits[1][0].name == cd._tracks[1].name
+    # Expected `Stars In Her Skies`, got `Jul`
+    assert splits[1][1].name == cd._tracks[1].name
+    # Expected `Chasing Daylight`, got `Stars In Her Skies`
+    assert splits[2][0].name == cd._tracks[2].name
+    # Expected `Chasing Daylight`, got `Stars In Her Skies`
+    assert splits[2][1].name == cd._tracks[2].name
+
+    cd = cds[1]
+    cd._test_size = 249 + 343
+    cd.numberize()
+    cd.populate()
+    cd._executor.shutdown()
+    splits = cd.calculate_splits()
+    assert len(splits) == 0
+
+    cd._test_size = 249
+    splits = cd.calculate_splits()
+    assert len(splits) == 1
+    assert splits[0][0] == cd._tracks[0]
+    assert splits[0][1] == cd._tracks[1]
