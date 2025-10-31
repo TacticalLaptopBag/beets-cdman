@@ -20,6 +20,9 @@ dependencies = [
 packages = [{include = "beetsplug"}]
 
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.2"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
