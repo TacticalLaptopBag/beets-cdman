@@ -63,10 +63,13 @@ class CD(ABC):
 
     def _cleanup_path(self, path: Path, tracks: Sequence[CDTrack]):
         for existing_path in path.iterdir():
-            if not existing_path.is_file():
+            if not existing_path.is_file() and not existing_path.is_symlink():
                 continue
             
-            mimetype = Magic(mime=True).from_file(existing_path)
+            mime_path = existing_path
+            if mime_path.is_symlink():
+                mime_path = existing_path.resolve()
+            mimetype = Magic(mime=True).from_file(mime_path)
             if not mimetype.startswith("audio/"):
                 continue
 
