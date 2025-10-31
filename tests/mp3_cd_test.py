@@ -15,7 +15,7 @@ cd_path = Path(__file__).parent / "mp3_cds"
 
 @fixture
 def executor():
-    return DimensionalThreadPoolExecutor(4)
+    return DimensionalThreadPoolExecutor(6)
 
 
 @fixture
