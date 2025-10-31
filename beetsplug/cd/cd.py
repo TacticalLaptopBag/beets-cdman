@@ -66,9 +66,7 @@ class CD(ABC):
             if not existing_path.is_file() and not existing_path.is_symlink():
                 continue
             
-            mime_path = existing_path
-            if mime_path.is_symlink():
-                mime_path = existing_path.resolve()
+            mime_path = existing_path.resolve() if existing_path.is_symlink() else existing_path
             mimetype = Magic(mime=True).from_file(mime_path)
             if not mimetype.startswith("audio/"):
                 continue
