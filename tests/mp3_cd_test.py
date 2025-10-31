@@ -119,3 +119,34 @@ def test_cleanup(cds):
     # TODO: Write this
     cds[0]._executor.shutdown()
     assert False
+
+
+def test_calculate_splits(cds):
+    cds[0].numberize()
+    cds[0].populate()
+    cds[0]._executor.shutdown()
+    
+    cd = cds[0]
+    tracks = cd.get_tracks()
+    
+    # Split right at folder
+    cd._test_size = 4437541 + 3976559
+    splits = cd.calculate_splits()
+    assert len(splits) == 2
+    assert splits[0].start == tracks[0]
+    assert splits[0].end == tracks[1]
+    assert splits[1].start == tracks[2]
+    assert splits[1].end == tracks[3]
+
+    # Split in between folders
+    cd._test_size = 4695280
+    splits = cd.calculate_splits()
+    assert len(splits) == 4
+    assert splits[0].start == tracks[0]
+    assert splits[0].end == tracks[0]
+    assert splits[1].start == tracks[1]
+    assert splits[1].end == tracks[1]
+    assert splits[2].start == tracks[2]
+    assert splits[2].end == tracks[2]
+    assert splits[3].start == tracks[3]
+    assert splits[3].end == tracks[3]
