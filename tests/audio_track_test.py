@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 import math
 from pathlib import Path
 import shutil

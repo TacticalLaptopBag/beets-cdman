@@ -2,8 +2,6 @@ from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 import math
 from pathlib import Path
-import shutil
-import ffmpeg
 from pytest import fixture, raises
 
 from beetsplug.cd.audio.audio_populate_mode import AudioPopulateMode
