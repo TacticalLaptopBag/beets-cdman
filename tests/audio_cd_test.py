@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 from pytest import fixture
 
 from beetsplug.cd.audio.audio_cd import AudioCD
@@ -105,12 +106,12 @@ def test_cleanup(cds):
         Stats.reset()
 
         # Case 1: Song no longer exists in CD
-        # track1_path = cd._tracks[0].dst_path
-        # shutil.copy2(track1_path, track1_path.with_name("04 Extra Song.m4a"))
-        # cd.cleanup()
-        # cd._executor.wait()
-        # assert Stats.tracks_removed == 1
-        # Stats.reset()
+        track1_path = cd._tracks[0].dst_path
+        shutil.copy2(track1_path, track1_path.with_name("04 Extra Song.m4a"))
+        cd.cleanup()
+        cd._executor.wait()
+        assert Stats.tracks_removed == 1
+        Stats.reset()
 
         # Case 2: Song has changed position
         track2_path = cd._tracks[1].dst_path
