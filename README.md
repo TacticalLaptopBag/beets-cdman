@@ -14,6 +14,7 @@ and easily add, remove, or reorder folders.
   - [Usage](#usage)
   - [MP3 CDs](#mp3-cds)
   - [CD Definition Files](#cd-definition-files)
+  - [Credits](#credits)
 
 
 ## Install
@@ -121,3 +122,9 @@ You can find an example CD definition file [here][cd-def-example]
 [beets-alt-plugin]: https://github.com/geigerzaehler/beets-alternatives/
 [brasero-page]: https://wiki.gnome.org/Apps/Brasero/
 [k3b-page]: https://apps.kde.org/k3b/
+
+## Credits
+
+The music files used for testing are all created by [Scott Buckley](https://www.scottbuckley.com.au/),
+and is protected under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.en).
+
