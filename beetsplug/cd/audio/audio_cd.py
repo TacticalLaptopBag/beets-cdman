@@ -6,7 +6,7 @@ from beetsplug.cd.track import CDTrack
 
 from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from ..cd import CD
-from .audiotrack import AudioTrack
+from .audio_track import AudioTrack
 
 
 class AudioCD(CD):

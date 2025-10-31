@@ -7,7 +7,7 @@ from typing import override
 from ...stats import Stats
 from ...config import Config
 from ..track import CDTrack
-from .audiopopulatemode import AudioPopulateMode
+from .audio_populate_mode import AudioPopulateMode
 
 
 class AudioTrack(CDTrack):

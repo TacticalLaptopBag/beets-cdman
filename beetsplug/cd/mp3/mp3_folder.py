@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
-from .mp3track import MP3Track
+from .mp3_track import MP3Track
 
 
 class MP3Folder:

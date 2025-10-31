@@ -9,7 +9,7 @@ from ...config import Config
 from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from ...util import unnumber_name
 from ..cd import CD
-from .folder import MP3Folder
+from .mp3_folder import MP3Folder
 
 # TODO: __root__ folder should go to CD root!
 
