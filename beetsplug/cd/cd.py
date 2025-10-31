@@ -116,23 +116,17 @@ class CD(ABC):
 
         next_split = CDSplit(tracks[0])
         max_size = self.max_size if self._test_size < 0 else self._test_size
-        print(f"Using max_size of {max_size}")
         for track in tracks:
             track_size = len(track)
-            print(f"current split size: {next_split.size}")
-            print(f"Next track {track.name} size: {track_size}")
 
             if next_split.size + track_size > max_size:
-                print(f"Track is too big, finalize split at {next_split.start.name} - {next_split.end.name}")
                 # Too big for one CD
                 splits.append(next_split)
                 next_split = CDSplit(track, track_size)
             else:
                 next_split.size += track_size
-                print(f"Add to split, total of {next_split.size}")
                 
             next_split.end = track
         
-        print(f"Last split ({next_split.size}): {next_split.start.name} - {next_split.end.name}")
         splits.append(next_split)
         return splits
