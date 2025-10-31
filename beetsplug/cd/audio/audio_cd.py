@@ -2,8 +2,6 @@ from pathlib import Path
 from typing import override
 from more_itertools import divide
 
-from beetsplug.cd.track import CDTrack
-
 from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from ..cd import CD
 from .audio_track import AudioTrack
@@ -27,12 +25,6 @@ class AudioCD(CD):
     @override
     def cleanup(self):
         self._cleanup_path(self._path, self._tracks)
-
-    @override
-    def populate(self):
-        for track_chunk in divide(self._executor.max_workers, self._tracks):
-            self._executor.submit(self._populate_chunk, track_chunk)
-        return None
 
     @override
     def get_tracks(self):
