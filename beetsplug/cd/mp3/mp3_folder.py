@@ -31,5 +31,6 @@ class MP3Folder:
 
         track_count = len(self._tracks)
         for i, track in enumerate(self._tracks):
+            track.dst_directory = self._path
             track.set_dst_path(i+1, track_count)
         return None

@@ -10,7 +10,7 @@ from ..util import unnumber_name
 class CDTrack(ABC):
     def __init__(self, src_path: Path, dst_directory: Path):
         self._src_path = src_path
-        self._dst_directory = dst_directory
+        self.dst_directory = dst_directory
         self._dst_path: Optional[Path] = None
         self._name = unnumber_name(src_path.stem)
 
@@ -23,10 +23,6 @@ class CDTrack(ABC):
     @property
     def src_path(self) -> Path:
         return self._src_path
-
-    @property
-    def dst_directory(self) -> Path:
-        return self._dst_directory
 
     @property
     def name(self) -> str:
@@ -42,7 +38,7 @@ class CDTrack(ABC):
     def set_dst_path(self, track_number: int, track_count: int):
         digit_length = max(2, len(str(track_count)))
         numbered = str(track_number).zfill(digit_length)
-        self._dst_path = self._dst_directory / f"{numbered} {self._name}{self._get_dst_extension()}"
+        self._dst_path = self.dst_directory / f"{numbered} {self._name}{self._get_dst_extension()}"
         return None
 
     def is_similar(self, other_path: Path) -> bool:
