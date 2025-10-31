@@ -70,7 +70,7 @@ class CD(ABC):
             if not mimetype.startswith("audio/"):
                 continue
 
-            existing_track_name = unnumber_name(existing_path.name)
+            existing_track_name = unnumber_name(existing_path.stem)
             existing_track = next((track for track in tracks if track.name == existing_track_name), None)
             if existing_track is None:
                 # Track is no longer in CD
