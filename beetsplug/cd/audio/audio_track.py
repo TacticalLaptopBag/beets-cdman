@@ -4,10 +4,10 @@ from pathlib import Path
 import shutil
 from typing import override
 
-from ...stats import Stats
-from ...config import Config
-from ..track import CDTrack
-from .audio_populate_mode import AudioPopulateMode
+from beetsplug.stats import Stats
+from beetsplug.config import Config
+from beetsplug.cd.track import CDTrack
+from beetsplug.cd.audio.audio_populate_mode import AudioPopulateMode
 
 
 class AudioTrack(CDTrack):

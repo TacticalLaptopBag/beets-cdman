@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from .mp3_track import MP3Track
+from beetsplug.cd.mp3.mp3_track import MP3Track
 
 
 class MP3Folder:

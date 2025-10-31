@@ -3,9 +3,9 @@ import subprocess
 import sys
 from typing import override
 
-from ...stats import Stats
-from ...config import Config
-from ..track import CDTrack
+from beetsplug.stats import Stats
+from beetsplug.config import Config
+from beetsplug.cd.track import CDTrack
 
 
 class MP3Track(CDTrack):

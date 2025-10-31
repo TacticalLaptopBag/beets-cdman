@@ -8,8 +8,8 @@ from beetsplug.cd.audio.audio_populate_mode import AudioPopulateMode
 from beetsplug.cd.audio.audio_track import AudioTrack
 from beetsplug.cd.mp3.mp3_track import MP3Track
 from beetsplug.cd.track import CDTrack
-from beetsplug.stats import Stats
-from . import common
+
+from tests import common
 
 
 file_path = Path(__file__)

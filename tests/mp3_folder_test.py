@@ -4,7 +4,7 @@ from pytest import fixture, raises
 from beetsplug.cd.mp3.mp3_folder import MP3Folder
 from beetsplug.cd.mp3.mp3_track import MP3Track
 
-from . import common
+from tests import common
 
 
 music_path = common.music_path

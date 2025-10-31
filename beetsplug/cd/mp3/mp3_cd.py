@@ -2,14 +2,12 @@ from pathlib import Path
 import shutil
 from typing import override
 
-from beetsplug.cd.track import CDTrack
-
-from ...stats import Stats
-from ...config import Config
-from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
-from ...util import unnumber_name
-from ..cd import CD
-from .mp3_folder import MP3Folder
+from beetsplug.stats import Stats
+from beetsplug.config import Config
+from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.util import unnumber_name
+from beetsplug.cd.cd import CD
+from beetsplug.cd.mp3.mp3_folder import MP3Folder
 
 # TODO: __root__ folder should go to CD root!
 

@@ -8,7 +8,7 @@ from beetsplug.cd.audio.audio_track import AudioTrack
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from beetsplug.stats import Stats
 
-from . import common
+from tests import common
 
 
 music_path = common.music_path

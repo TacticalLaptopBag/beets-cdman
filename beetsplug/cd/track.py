@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, override
 import ffmpeg
 
-from ..util import unnumber_name
+from beetsplug.util import unnumber_name
 
 
 class CDTrack(ABC):

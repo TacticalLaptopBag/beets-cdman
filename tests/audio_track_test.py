@@ -7,7 +7,8 @@ from pytest import fixture
 from beetsplug.cd.audio.audio_populate_mode import AudioPopulateMode
 from beetsplug.cd.audio.audio_track import AudioTrack
 from beetsplug.stats import Stats
-from . import common_track_test
+
+from tests import common_track_test
 
 
 file_path = Path(__file__)

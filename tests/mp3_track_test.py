@@ -6,7 +6,8 @@ from pytest import fixture
 
 from beetsplug.cd.mp3.mp3_track import MP3Track
 from beetsplug.stats import Stats
-from . import common_track_test
+
+from tests import common_track_test
 
 
 file_path = Path(__file__)

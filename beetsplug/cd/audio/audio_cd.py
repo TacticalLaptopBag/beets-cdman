@@ -1,10 +1,9 @@
 from pathlib import Path
 from typing import override
-from more_itertools import divide
 
-from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
-from ..cd import CD
-from .audio_track import AudioTrack
+from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.cd.cd import CD
+from beetsplug.cd.audio.audio_track import AudioTrack
 
 
 class AudioCD(CD):

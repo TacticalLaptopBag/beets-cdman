@@ -2,15 +2,15 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 import os
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator
 from magic import Magic
 from more_itertools import divide
 
-from ..stats import Stats
-from ..config import Config
-from ..dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
-from ..util import unnumber_name
-from .track import CDTrack
+from beetsplug.stats import Stats
+from beetsplug.config import Config
+from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.util import unnumber_name
+from beetsplug.cd.track import CDTrack
 
 
 def _rm_job(path: Path):
