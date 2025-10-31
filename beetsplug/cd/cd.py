@@ -36,6 +36,7 @@ class CD(ABC):
         super().__init__()
         self._path = path
         self._executor = executor
+        self._test_size = -1
 
     @property
     def path(self) -> Path:
@@ -103,6 +104,7 @@ class CD(ABC):
         start_track: Optional[CDTrack] = None
         last_track: Optional[CDTrack] = None
         split_size = 0.0
+        max_size = self.max_size if self._test_size < 0 else self._test_size
         for track in tracks:
             if start_track is None:
                 start_track = track
@@ -110,7 +112,7 @@ class CD(ABC):
                 last_track = track
 
             track_size = len(track)
-            if split_size + track_size > self.max_size:
+            if split_size + track_size > max_size:
                 splits.append((start_track, last_track))
                 start_track = track
                 split_size = track_size
