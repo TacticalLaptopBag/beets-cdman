@@ -63,6 +63,7 @@ def populated_tracks(numbered_tracks):
 
 def test_populate(numbered_tracks):
     shutil.rmtree(track_path, ignore_errors=True)
+    Stats.reset()
 
     for i, track in enumerate(numbered_tracks):
         track.populate()
@@ -77,7 +78,6 @@ def test_populate(numbered_tracks):
 
         track.populate()
         assert Stats.tracks_skipped == i+1
-    Stats.reset()
 
 
 def check_populate_mode(track: AudioTrack):

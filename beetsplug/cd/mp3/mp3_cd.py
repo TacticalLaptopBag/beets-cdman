@@ -73,7 +73,7 @@ class MP3CD(CD):
 
     @override
     def get_tracks(self):
-        return [track for folder in self._folders for track in folder._tracks]
+        return [track for folder in self._folders for track in folder.tracks]
 
     @override
     def numberize(self):

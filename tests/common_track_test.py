@@ -9,11 +9,11 @@ from beetsplug.cd.audio.audio_track import AudioTrack
 from beetsplug.cd.mp3.mp3_track import MP3Track
 from beetsplug.cd.track import CDTrack
 from beetsplug.stats import Stats
+from . import common
 
 
 file_path = Path(__file__)
-music_path = file_path.parent / "music"
-assert music_path.exists()
+music_path = common.music_path
 track_path = file_path.parent / "common_tracks"
 
 
@@ -22,8 +22,8 @@ def tracks() -> list[CDTrack]:
     return [
         MP3Track(
             music_path / "01 Jul.m4a",
-            track_path,
             128,
+            track_path,
         ),
         AudioTrack(
             music_path / "002 Snowfall.mp3",
@@ -32,8 +32,8 @@ def tracks() -> list[CDTrack]:
         ),
         MP3Track(
             music_path / "3 Stars In Her Skies.mp3",
-            track_path,
             256,
+            track_path,
         ),
         AudioTrack(
             music_path / "A Kind Of Hope.ogg",
@@ -42,8 +42,8 @@ def tracks() -> list[CDTrack]:
         ),
         MP3Track(
             music_path / "Chasing Daylight.opus",
-            track_path,
             192,
+            track_path,
         ),
         AudioTrack(
             music_path / "Horizons.flac",
@@ -65,7 +65,6 @@ def populate_tracks(tracks: Sequence[CDTrack]) -> Sequence[CDTrack]:
     for track in tracks:
         executor.submit(track.populate)
     executor.shutdown()
-    Stats.reset()
     return tracks
 
 

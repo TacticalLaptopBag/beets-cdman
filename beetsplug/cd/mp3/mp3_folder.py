@@ -1,16 +1,14 @@
 from pathlib import Path
 
-from ...dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from .mp3_track import MP3Track
 
 
 class MP3Folder:
-    def __init__(self, path: Path, tracks: list[MP3Track], executor: DimensionalThreadPoolExecutor):
+    def __init__(self, path: Path, tracks: list[MP3Track]):
         self._path = path
         self._name = path.name
         self._tracks = tracks
         self._numberized = False
-        self._executor = executor
 
     @property
     def path(self):
@@ -19,6 +17,10 @@ class MP3Folder:
     @property
     def name(self):
         return self._name
+
+    @property
+    def tracks(self):
+        return self._tracks
 
     def numberize(self, folder_number: int, folder_count: int):
         if self._numberized:

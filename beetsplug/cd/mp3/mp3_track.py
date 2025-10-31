@@ -9,7 +9,9 @@ from ..track import CDTrack
 
 
 class MP3Track(CDTrack):
-    def __init__(self, src_path: Path, dst_directory: Path, bitrate: int):
+    def __init__(self, src_path: Path, bitrate: int, dst_directory: Path = Path()):
+        # dst_directory will be overwritten by CDFolder,
+        # but we should still expose dst_directory for tests.
         super().__init__(src_path, dst_directory)
         self._bitrate = bitrate
 
@@ -52,7 +54,7 @@ class MP3Track(CDTrack):
         )
         if result.returncode != 0:
             if Config.verbose:
-                sys.stderr.write(f"Error converting `{self._src_path}`! Look in `{self._dst_directory}` for ffmpeg logs.\n")
+                sys.stderr.write(f"Error converting `{self._src_path}`! Look in `{self.dst_directory}` for ffmpeg logs.\n")
 
             stdout_log_path = self._dst_path.with_suffix(".stdout.log")
             stderr_log_path = self._dst_path.with_suffix(".stderr.log")

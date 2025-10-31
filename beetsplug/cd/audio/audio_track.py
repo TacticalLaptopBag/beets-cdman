@@ -50,7 +50,7 @@ class AudioTrack(CDTrack):
             Stats.track_populated()
             return None
         
-        self._dst_directory.mkdir(parents=True, exist_ok=True)
+        self.dst_directory.mkdir(parents=True, exist_ok=True)
         verbose_format = f"{{}} {self._src_path} to {self._dst_path}"
         try:
             match self._populate_mode:

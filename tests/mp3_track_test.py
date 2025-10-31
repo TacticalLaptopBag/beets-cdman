@@ -19,33 +19,33 @@ def tracks() -> list[MP3Track]:
     return [
         MP3Track(
             music_path / "01 Jul.m4a",
-            track_path,
             128,
+            track_path,
         ),
         MP3Track(
             music_path / "002 Snowfall.mp3",
-            track_path,
             192,
+            track_path,
         ),
         MP3Track(
             music_path / "3 Stars In Her Skies.mp3",
-            track_path,
             256,
+            track_path,
         ),
         MP3Track(
             music_path / "A Kind Of Hope.ogg",
-            track_path,
             128,
+            track_path,
         ),
         MP3Track(
             music_path / "Chasing Daylight.opus",
-            track_path,
             192,
+            track_path,
         ),
         MP3Track(
             music_path / "Horizons.flac",
-            track_path,
             256,
+            track_path,
         ),
     ]
 
@@ -62,6 +62,7 @@ def populated_tracks(numbered_tracks):
 
 def test_populate(numbered_tracks, capsys):
     shutil.rmtree(track_path, ignore_errors=True)
+    Stats.reset()
 
     for i, track in enumerate(numbered_tracks):
         track.populate()
@@ -78,7 +79,6 @@ def test_populate(numbered_tracks, capsys):
 
         track.populate()
         assert Stats.tracks_skipped == i+1
-    Stats.reset()
 
 
 def test_len(populated_tracks):
