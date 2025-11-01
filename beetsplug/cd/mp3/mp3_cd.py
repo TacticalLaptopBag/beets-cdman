@@ -42,7 +42,7 @@ class MP3CD(CD):
 
     @CD.max_size.getter
     def max_size(self) -> float:
-        return 700_000_000
+        return 735_397_888
 
     @override
     def cleanup(self):

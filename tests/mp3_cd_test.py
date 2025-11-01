@@ -128,8 +128,8 @@ def dup_cd(executor) -> MP3CD:
 
 def test_max_size(cds):
     with cds[0]._executor:
-        assert cds[0].max_size == 700_000_000
-        assert cds[1].max_size == 700_000_000
+        assert cds[0].max_size == 735_397_888
+        assert cds[1].max_size == 735_397_888
 
 
 def test_numberize(cds):
