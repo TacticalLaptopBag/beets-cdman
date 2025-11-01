@@ -49,6 +49,10 @@ dependencies = [
     "python-magic (>=0.4.27,<0.5.0)",
 ]
 
+[project.urls]
+Repository = "https://github.com/TacticalLaptopBag/beets-cdman"
+Issues = "https://github.com/TacticalLaptopBag/beets-cdman/issues"
+
 [tool.poetry]
 packages = [{include = "beetsplug"}]
 
