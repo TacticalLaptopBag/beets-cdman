@@ -10,6 +10,13 @@ class MP3Folder:
         self._tracks = tracks
         self._numberized = False
 
+        if self.is_root:
+            self._path = self._path.parent
+
+    @property
+    def is_root(self):
+        return self._name == "__root__"
+
     @property
     def path(self):
         return self._path
@@ -25,11 +32,12 @@ class MP3Folder:
     def numberize(self, folder_number: int, folder_count: int):
         if self._numberized:
             raise RuntimeError(f"Folder at {self._path} is already numberized!")
-            
+        
         self._numberized = True
-        digit_length = max(2, len(str(folder_count)))
-        numbered = str(folder_number).zfill(digit_length)
-        self._path = self._path.parent / f"{numbered} {self._path.stem}"
+        if not self.is_root:
+            digit_length = max(2, len(str(folder_count)))
+            numbered = str(folder_number).zfill(digit_length)
+            self._path = self._path.parent / f"{numbered} {self._path.stem}"
 
         track_count = len(self._tracks)
         for i, track in enumerate(self._tracks):

@@ -146,7 +146,6 @@ def test_cleanup(cds):
         assert not track3_renamed.exists()
 
 
-
 def test_calculate_splits(cds):
     with cds[0]._executor:
         cds[0].numberize()
