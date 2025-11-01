@@ -103,6 +103,10 @@ class CDManPlugin(BeetsPlugin):
                 cd.numberize()
                 cd.cleanup()
                 cd.populate()
+
+            # Wait for all populates to finish before calculating splits
+            self._executor.wait()
+            for cd in cds:
                 self._executor.submit(split_job, cd)
 
         for cd in cd_splits:
