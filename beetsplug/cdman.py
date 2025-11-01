@@ -1,6 +1,7 @@
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 import psutil
 from typing import Optional, override
 from beets.plugins import BeetsPlugin
@@ -12,6 +13,8 @@ from beetsplug.cd.cd import CD, CDSplit
 from beetsplug.cd_parser import CDParser
 from beetsplug.config import Config
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.printer import Printer
+from beetsplug.stats import Stats
 
 
 class CDManPlugin(BeetsPlugin):
@@ -24,6 +27,10 @@ class CDManPlugin(BeetsPlugin):
             "bitrate": 128,
             "threads": hw_thread_count,
         })
+        self._summary_thread = Thread(
+            target=self._summary_thread_function,
+            name="Summary",
+        )
 
     @override
     def commands(self):
@@ -76,6 +83,8 @@ class CDManPlugin(BeetsPlugin):
         Config.verbose = opts.verbose
         Config.dry = opts.dry
 
+        self._summary_thread.start()
+
         cd_parser = CDParser(lib, opts, self.config, self._executor)
         if len(args) == 0:
             # Load CDs from config
@@ -105,9 +114,14 @@ class CDManPlugin(BeetsPlugin):
                 cd.populate()
 
             # Wait for all populates to finish before calculating splits
-            self._executor.wait()
-            for cd in cds:
-                self._executor.submit(split_job, cd)
+            if not Config.dry:
+                self._executor.wait()
+                Stats.set_calculating()
+                for cd in cds:
+                    self._executor.submit(split_job, cd)
+
+        Stats.set_done()
+        self._summary_thread.join()
 
         for cd in cd_splits:
             splits = cd_splits[cd]
@@ -116,3 +130,53 @@ class CDManPlugin(BeetsPlugin):
                 for i, split in enumerate(splits):
                     print(f"\t({i+1}/{len(splits)}): {split.start.dst_path.name} -- {split.end.dst_path.name}")
         return None
+
+    def _summary_thread_function(self):
+        p = Printer()
+        spinner = ["-", "\\", "|", "/"]
+        dancing_dots = [".", "..", " ..", "  ..", "   ..", "    .", "    .", "   ..", "  ..", " ..", "..", "."]
+        ellipses = ["", ".", ".", "..", "..", "...", "...", "...", "..."]
+
+        current_indicator = 0
+        indicator_time = 0.1 if not Config.verbose else None
+        last_check = datetime.now().timestamp()
+        while True:
+            with Stats.changed_cond:
+                Stats.changed_cond.wait(indicator_time)
+
+            if Stats.is_calculating:
+                indicator = ellipses
+            elif Stats.tracks_populating > 0:
+                indicator = spinner
+            else:
+                indicator = dancing_dots
+
+            if indicator_time is not None:
+                if datetime.now().timestamp() - last_check >= indicator_time:
+                    current_indicator += 1
+                    last_check = datetime.now().timestamp()
+            current_indicator = current_indicator % len(indicator)
+
+            with Stats.lock:
+                if Config.verbose and not Stats.is_done:
+                    continue
+                p.print_line(1, f"Tracks populated: {Stats.tracks_populated}")
+                p.print_line(2, f"Tracks skipped: {Stats.tracks_skipped}")
+                p.print_line(3, f"Tracks deleted: {Stats.tracks_deleted}")
+                p.print_line(4, f"Tracks moved: {Stats.tracks_moved}")
+                p.print_line(5, f"Tracks failed: {Stats.tracks_failed}")
+                p.print_line(6, f"Folders deleted: {Stats.folders_deleted}")
+                p.print_line(7, f"Folders moved: {Stats.folders_moved}")
+
+                if not Config.verbose:
+                    if Stats.is_calculating:
+                        msg = f"Checking CD sizes{indicator[current_indicator]}"
+                    else:
+                        if Stats.tracks_populating > 0:
+                            msg = f"Tracks populating: {Stats.tracks_populating} {indicator[current_indicator] * Stats.tracks_populating}"
+                        else:
+                            msg = f"Searching for tracks{indicator[current_indicator]}"
+                    p.print_line(9, msg)
+
+                if Stats.is_done:
+                    break
