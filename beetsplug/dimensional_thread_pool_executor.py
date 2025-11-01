@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
+import sys
 from typing import Any, Callable, Optional
 
 
@@ -70,10 +71,15 @@ class DimensionalThreadPoolExecutor:
                 # Shutdown was called and all tasks complete, we can rest now
                 break
 
-            task.run()
-
-            # Signal to the Queue that a task was completed
-            self._tasks.task_done()
+            try:
+                task.run()
+            except BaseException as e:
+                sys.stderr.write("Exception occurred while running task:\n")
+                sys.stderr.write(str(e))
+                sys.stderr.write("\n")
+            finally:
+                # Signal to the Queue that a task was completed
+                self._tasks.task_done()
 
     def __enter__(self):
         return self
