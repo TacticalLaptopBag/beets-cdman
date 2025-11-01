@@ -1,4 +1,6 @@
+from collections.abc import Sequence
 from pathlib import Path
+from threading import Lock
 import psutil
 from typing import Optional, override
 from beets.plugins import BeetsPlugin
@@ -6,7 +8,7 @@ from beets.ui import Subcommand
 from beets.library import Library
 from optparse import Values
 
-from beetsplug.cd.cd import CD
+from beetsplug.cd.cd import CD, CDSplit
 from beetsplug.cd_parser import CDParser
 from beetsplug.config import Config
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
@@ -89,9 +91,24 @@ class CDManPlugin(BeetsPlugin):
                 arg_cds = cd_parser.from_path(arg_path)
                 cds.extend(arg_cds)
 
+        cd_splits: dict[CD, Sequence[CDSplit]] = {}
+        cd_splits_lock = Lock()
+        def split_job(cd: CD):
+            splits = cd.calculate_splits()
+            with cd_splits_lock:
+                cd_splits[cd] = splits
+            
         with self._executor:
             for cd in cds:
                 cd.numberize()
                 cd.cleanup()
                 cd.populate()
+                self._executor.submit(split_job, cd)
+
+        for cd in cd_splits:
+            splits = cd_splits[cd]
+            if len(splits) > 1:
+                print(f"`{cd.path.name}` is too big to fit on one CD! It must be split across multiple CDs like so:")
+                for i, split in enumerate(splits):
+                    print(f"\t({i+1}/{len(splits)}): {split.start.dst_path.name} -- {split.end.dst_path.name}")
         return None
