@@ -90,6 +90,42 @@ def cds(executor) -> list[MP3CD]:
     ]
 
 
+@fixture
+def dup_cd(executor) -> MP3CD:
+    return MP3CD(
+        cd_path / "cd_dup",
+        [
+            MP3Folder(
+                cd_path / "cd_dup" / "duplicate",
+                [
+                    MP3Track(
+                        music_path / "01 Jul.m4a",
+                        128,
+                    ),
+                    MP3Track(
+                        music_path / "01 Jul.m4a",
+                        128,
+                    ),
+                ],
+            ),
+            MP3Folder(
+                cd_path / "cd_dup" / "duplicate",
+                [
+                    MP3Track(
+                        music_path / "01 Jul.m4a",
+                        128,
+                    ),
+                    MP3Track(
+                        music_path / "01 Jul.m4a",
+                        128,
+                    ),
+                ],
+            ),
+        ],
+        executor,
+    )
+
+
 def test_max_size(cds):
     with cds[0]._executor:
         assert cds[0].max_size == 700_000_000
@@ -216,6 +252,20 @@ def test_cleanup(cds):
         assert track2_path.exists()
         assert not track1_renamed.exists()
         assert not track2_renamed.exists()
+
+
+def test_cleanup_with_duplicates(dup_cd):
+    with dup_cd._executor:
+        dup_cd.numberize()
+        dup_cd.populate()
+        dup_cd._executor.wait()
+        Stats.reset()
+
+        dup_cd.cleanup()
+        assert Stats.tracks_moved == 0
+        assert Stats.tracks_removed == 0
+        assert Stats.folders_moved == 0
+        assert Stats.folders_removed == 0
 
 
 def test_calculate_splits(cds):

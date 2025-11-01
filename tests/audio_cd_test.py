@@ -63,6 +63,26 @@ def cds(executor) -> list[AudioCD]:
     ]
 
 
+@fixture
+def dup_cd(executor) -> AudioCD:
+    return AudioCD(
+        cd_path / "cd_dup",
+        [
+            AudioTrack(
+                music_path / "01 Jul.m4a",
+                cd_path / "cd_dup",
+                AudioPopulateMode.COPY,
+            ),
+            AudioTrack(
+                music_path / "01 Jul.m4a",
+                cd_path / "cd_dup",
+                AudioPopulateMode.COPY,
+            ),
+        ],
+        executor,
+    )
+
+
 def test_max_size(cds):
     with cds[0]._executor:
         assert cds[0].max_size == 4800
@@ -144,6 +164,18 @@ def test_cleanup(cds):
         assert track3_path.exists()
         assert not track2_renamed.exists()
         assert not track3_renamed.exists()
+
+
+def test_cleanup_with_duplicates(dup_cd):
+    with dup_cd._executor:
+        dup_cd.numberize()
+        dup_cd.populate()
+        dup_cd._executor.wait()
+        Stats.reset()
+
+        dup_cd.cleanup()
+        assert Stats.tracks_moved == 0
+        assert Stats.tracks_removed == 0
 
 
 def test_calculate_splits(cds):
