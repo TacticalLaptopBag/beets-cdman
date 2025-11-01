@@ -2,7 +2,7 @@
 This [beets][beets-docs]
 plugin lets you easily manage your collection of CDs.
 You can define CDs in your beets config and with
-[CD definition file][cd-def-example]s,
+[CD definition files][cd-def-example],
 and easily add, remove, or reorder folders.
 
 `cdman` can't burn CDs, but this can be done by other software such as
