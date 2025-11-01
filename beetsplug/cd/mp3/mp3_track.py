@@ -25,11 +25,15 @@ class MP3Track(CDTrack):
             raise RuntimeError("set_dst_path must be run before populate!")
 
         if self.is_similar(self.dst_path):
-            # Track already exists, skip
-            if Config.verbose:
-                print(f"Skipped {self._dst_path}")
-            Stats.track_skipped()
-            return
+            stream = self._dst_stream
+            if stream is not None and "bit_rate" in stream:
+                dst_bitrate = int(stream["bit_rate"])
+                if dst_bitrate == self._bitrate * 1_000:
+                    # Track already exists and has matching bitrate, skip
+                    if Config.verbose:
+                        print(f"Skipped {self._dst_path}")
+                    Stats.track_skipped()
+                    return
         self._dst_path.parent.mkdir(parents=True, exist_ok=True)
 
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
