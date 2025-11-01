@@ -266,6 +266,8 @@ def test_cleanup_with_duplicates(dup_cd):
         assert Stats.tracks_removed == 0
         assert Stats.folders_moved == 0
         assert Stats.folders_removed == 0
+        for folder in dup_cd._folders:
+            assert folder.path.exists()
 
 
 def test_calculate_splits(cds):
