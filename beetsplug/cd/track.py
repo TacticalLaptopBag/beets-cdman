@@ -42,9 +42,12 @@ class CDTrack(ABC):
         return None
 
     def is_similar(self, other_path: Path) -> bool:
-        src_duration = math.ceil(self.get_duration(self._src_path))
-        dst_duration = math.ceil(self.get_duration(other_path))
-        return src_duration == dst_duration
+        # There can be very small differences if source and dest teeter on the edge of .5
+        # A difference of 1 second is likely the same song
+        src_duration = round(self.get_duration(self._src_path))
+        dst_duration = round(self.get_duration(other_path))
+        duration_diff = abs(src_duration - dst_duration)
+        return duration_diff <= 1
 
     def get_size(self) -> int:
         if self._dst_path is None:
