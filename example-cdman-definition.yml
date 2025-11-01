@@ -1,30 +1,25 @@
 # This is an example CD definition file
 # You can create these yourself so you don't clutter your beets config,
 # or if you want to only convert a few CDs at a time rather than all at once.
+# These files can be added to the `cd_files` config field.
 
 # The structure is simple, and exactly the same as the `cds` config field:
-# cd-name:
-#   type: mp3
-#   folders:
-#     - name: First Folder Name
-#       query: "'album:Album Name'"
-#     - name: Second Folder Name
-#       query: "'other query' 'anded with first part of this query'"
-# second-cd-name:
-#   type: audio
-#   track_queries:
-#     - "'first tracks'"
-#     - "'next tracks'"
-
 ori:
   type: mp3
+  bitrate: 192  # optional, defaults to your config
   folders:
-    - name: Blind Forest
-      query: "'album:Ori and the Blind Forest'"
-    - name: Will of the Wisps
-      query: "'album:Ori and the Will of the Wisps'"
+    blind-forest:
+      name: Blind Forest
+      tracks:
+        - query: "'album:Ori and the Blind Forest'"
+    will-of-the-wisps:
+      name: Will of the Wisps
+      tracks:
+        - query: "'album:Ori and the Will of the Wisps'"
+
 discovery:
   type: audio
-  track_queries:
-    - "'artist:Daft Punk' 'album:Discovery'"
-    - "'artist:Daft Punk' 'album:Daft Club' 'Aerodynamic'"
+  populate_mode: copy  # optional, defaults to your config
+  tracks:
+    - query: "'artist:Daft Punk' 'album:Discovery'"
+    - query: "'artist:Daft Punk' 'album:Daft Club' 'Aerodynamic'"
