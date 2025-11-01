@@ -52,19 +52,24 @@ class MP3CD(CD):
                 continue
 
             existing_folder_name = unnumber_name(existing_path.name)
-            existing_folder = next((folder for folder in self._folders if folder.name == existing_folder_name), None)
-            if existing_folder is None:
+            existing_folders = [folder for folder in self._folders if folder.name == existing_folder_name]
+            if len(existing_folders) == 0:
                 # Folder is no longer in CD
                 self._executor.submit(_rmdir_job, existing_path)
                 continue
             
-            assert existing_folder._numberized
-            if existing_folder.path == existing_path:
+            for existing_folder in existing_folders:
+                assert existing_folder._numberized
+            exact_folder = next(filter(lambda f: f.path == existing_path, existing_folders), None)
+            if exact_folder is not None:
                 # Path remains unchanged
                 continue
 
-            # Folder has been renamed
-            _mvdir_job(existing_path, existing_folder.path)
+            for existing_folder in existing_folders:
+                if not existing_folder.path.exists():
+                    # Folder has been renamed
+                    _mvdir_job(existing_path, existing_folder.path)
+                    break
 
         for folder in self._folders:
             self._cleanup_path(folder.path, folder._tracks)

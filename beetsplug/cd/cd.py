@@ -73,19 +73,25 @@ class CD(ABC):
                 continue
 
             existing_track_name = unnumber_name(existing_path.stem)
-            existing_track = next((track for track in tracks if track.name == existing_track_name), None)
-            if existing_track is None:
+            existing_tracks = [track for track in tracks if track.name == existing_track_name]
+            if len(existing_tracks) == 0:
                 # Track is no longer in CD
                 self._executor.submit(_rm_job, existing_path)
                 continue
 
-            if existing_track.dst_path == existing_path:
+            exact_track = next(filter(lambda t: t.dst_path == existing_path, existing_tracks), None)
+            if exact_track is not None:
                 # Path remains unchanged
                 continue
             
-            if existing_track.is_similar(existing_path):
-                # Path changed, and is likely the same song
-                self._executor.submit(_mv_job, existing_path, existing_track.dst_path)
+            found_track = False
+            for existing_track in existing_tracks:
+                if existing_track.is_similar(existing_path) and not existing_track.dst_path.exists():
+                    # Path changed, and is likely the same song
+                    self._executor.submit(_mv_job, existing_path, existing_track.dst_path)
+                    found_track = True
+                    break
+            if found_track:
                 continue
             
             # Does not appear to be the same song
