@@ -46,10 +46,6 @@ class AudioTrack(CDTrack):
                 print(f"Removed {self._dst_path} -- populate mode has changed.")
             Stats.track_removed()
 
-        if Config.dry:
-            Stats.track_populated()
-            return None
-        
         self.dst_directory.mkdir(parents=True, exist_ok=True)
         verbose_format = f"{{}} {self._src_path} to {self._dst_path}"
         try:
@@ -57,15 +53,18 @@ class AudioTrack(CDTrack):
                 case AudioPopulateMode.SOFT_LINK:
                     if Config.verbose:
                         print(verbose_format.format("Soft link"))
-                    os.symlink(self._src_path, self._dst_path)
+                    if not Config.dry:
+                        os.symlink(self._src_path, self._dst_path)
                 case AudioPopulateMode.HARD_LINK:
                     if Config.verbose:
                         print(verbose_format.format("Hard link"))
-                    os.link(self._src_path, self._dst_path)
+                    if not Config.dry:
+                        os.link(self._src_path, self._dst_path)
                 case AudioPopulateMode.COPY:
                     if Config.verbose:
                         print(verbose_format.format("Copy"))
-                    shutil.copy2(self._src_path, self._dst_path)
+                    if not Config.dry:
+                        shutil.copy2(self._src_path, self._dst_path)
                 case _:
                     Stats.track_failed()
                     raise RuntimeError("Invalid populate_mode")
