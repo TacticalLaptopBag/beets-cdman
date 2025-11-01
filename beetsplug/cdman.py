@@ -76,6 +76,15 @@ class CDManPlugin(BeetsPlugin):
         cmd.func = cdman_cmd
         return cmd
 
+    def _get_duplicates(self, cds: list[CD]) -> set[str]:
+        cd_paths = set[Path]()
+        duplicates = set[str]()
+        for cd in cds:
+            if cd.path in cd_paths:
+                duplicates.add(cd.path.name)
+            cd_paths.add(cd.path)
+        return duplicates
+
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
         max_threads: int = self.config["threads"].get(int) if opts.threads is None else opts.threads  # type: ignore
         self._executor = DimensionalThreadPoolExecutor(max_threads)
@@ -99,6 +108,18 @@ class CDManPlugin(BeetsPlugin):
                     continue
                 arg_cds = cd_parser.from_path(arg_path)
                 cds.extend(arg_cds)
+
+        if len(cds) == 0:
+            print("No CD definitions found!")
+            self._executor.shutdown()
+            return None
+
+        duplicates = self._get_duplicates(cds)
+        if len(duplicates) > 0:
+            print("Duplicate CD definitions found! Check your beets config and CD definition files for duplicate CD names.")
+            print(f"Duplicate CDs: {", ".join(duplicates)}")
+            self._executor.shutdown()
+            return None
 
         cd_splits: dict[CD, Sequence[CDSplit]] = {}
         cd_splits_lock = Lock()
