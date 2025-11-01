@@ -31,9 +31,10 @@ class AudioTrack(CDTrack):
 
         if self.is_similar(self._dst_path):
             # Track already exists, is it the correct mode?
+            is_hard_link = self._dst_path.stat().st_nlink > 1
             skip = (self._populate_mode == AudioPopulateMode.SOFT_LINK and self._dst_path.is_symlink())
-            skip = skip or (self._populate_mode == AudioPopulateMode.HARD_LINK and self._dst_path.stat().st_nlink > 1)
-            skip = skip or (self._populate_mode == AudioPopulateMode.COPY and self._dst_path.is_file())
+            skip = skip or (self._populate_mode == AudioPopulateMode.HARD_LINK and is_hard_link)
+            skip = skip or (self._populate_mode == AudioPopulateMode.COPY and self._dst_path.is_file() and not is_hard_link)
             if skip:
                 Stats.track_skipped()
                 if Config.verbose:
