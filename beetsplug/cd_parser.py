@@ -1,8 +1,6 @@
-import sys
-from xspf_lib import Playlist
 from optparse import Values
 from pathlib import Path
-from typing import Optional, OrderedDict
+from typing import OrderedDict
 from confuse import ConfigView, RootView, YamlSource, Subview
 from beets.library import Library, parse_query_string, Item
 
@@ -45,6 +43,7 @@ class CDParser:
         return cds
 
     def from_path(self, path: Path) -> list[CD]:
+        path = path.expanduser()
         if path.is_dir():
             cds: list[CD] = []
             for child in path.iterdir():
@@ -74,7 +73,7 @@ class CDParser:
             elif cd_type.lower() == "audio":
                 cds.append(self._parse_audio_data(cd_view))
             else:
-                sys.stderr.write(f"Invalid type for CD '{cd_name}'. Must be either 'mp3' or 'audio'.\n")
+                raise ValueError(f"Invalid type for CD '{cd_name}'. Must be either 'mp3' or 'audio'.\n")
         return cds
 
     def _parse_mp3_data(self, view: Subview) -> CD:
@@ -92,31 +91,16 @@ class CDParser:
         # Parse folders
         cd_folders: list[MP3Folder] = []
         folders_view = view["folders"]
-        for folder_name in folders_view:
-            folder_view = folders_view[folder_name]
+        for folder_key in folders_view:
+            folder_view = folders_view[folder_key]
             track_paths: list[Path] = []
 
-            # Parse query or queries
-            if "query" in folder_view:
-                query: str = folder_view["query"].get(str) # type: ignore
-                query_tracks = self._get_tracks_from_query(query)
-                track_paths.extend(query_tracks)
-            if "queries" in folder_view:
-                queries: list[str] = folder_view["queries"].get(list) # type: ignore
-                for query in queries:
-                    query_tracks = self._get_tracks_from_query(query)
-                    track_paths.extend(query_tracks)
-            
-            # Parse playlist or playlists
-            if "playlist" in folder_view:
-                playlist_path: str = folder_view["playlist"].get(str) # type: ignore
-                playlist_tracks = self._get_tracks_from_playlist(Path(playlist_path))
-                track_paths.extend(playlist_tracks)
-            if "playlists" in folder_view:
-                playlists: list[str] = folder_view["playlists"].get(list) # type: ignore
-                for playlist_path in playlists:
-                    playlist_tracks = self._get_tracks_from_playlist(Path(playlist_path))
-                    track_paths.extend(playlist_tracks)
+            folder_name: str = folder_key # type: ignore
+            if folder_key != "__root__" and "name" in folder_view:
+                folder_name = folder_view["name"].get(str) # type: ignore
+
+            tracks_data: list[OrderedDict[str, str]] = folder_view["tracks"].get(list) # type: ignore
+            track_paths = self._parse_tracks(tracks_data)
 
             # Convert found track paths into MP3Tracks
             mp3_tracks = [MP3Track(track_path, bitrate) for track_path in track_paths]
@@ -132,22 +116,29 @@ class CDParser:
     def _parse_audio_data(self, view: Subview) -> CD:
         cd_path = self.cds_path / view.key
 
-        # Determine population mode
-        population_mode = AudioPopulateMode.COPY
-        if "audio_population_mode" in self.config:
-            pop_mode_str: str = self.config["audio_population_mode"].get(str) # type: ignore
-            population_mode = AudioPopulateMode.from_str(pop_mode_str)
-        if "population_mode" in view:
-            pop_mode_str: str = view["population_mode"].get(str) # type: ignore
-            population_mode = AudioPopulateMode.from_str(pop_mode_str)
-        if self.opts.population_mode is not None:
-            pop_mode_str: str = self.opts.population_mode
-            population_mode = AudioPopulateMode.from_str(pop_mode_str)
-        if population_mode is None:
-            raise ValueError(f"Invalid population_mode for CD {view.key}")
+        # Determine populate mode
+        populate_mode = AudioPopulateMode.COPY
+        if "audio_populate_mode" in self.config:
+            pop_mode_str: str = self.config["audio_populate_mode"].get(str) # type: ignore
+            populate_mode = AudioPopulateMode.from_str(pop_mode_str)
+        if "populate_mode" in view:
+            pop_mode_str: str = view["populate_mode"].get(str) # type: ignore
+            populate_mode = AudioPopulateMode.from_str(pop_mode_str)
+        if self.opts.populate_mode is not None:
+            pop_mode_str: str = self.opts.populate_mode
+            populate_mode = AudioPopulateMode.from_str(pop_mode_str)
+        if populate_mode is None:
+            raise ValueError(f"Invalid populate_mode for CD {view.key}")
 
         # Parse tracks
         tracks_data: list[OrderedDict[str, str]] = view["tracks"].get(list) # type: ignore
+        track_paths = self._parse_tracks(tracks_data)
+
+        # Convert found track paths into AudioTracks
+        tracks = [AudioTrack(track_path, cd_path, populate_mode) for track_path in track_paths]
+        return AudioCD(cd_path, tracks, self.executor)
+    
+    def _parse_tracks(self, tracks_data: list[OrderedDict[str, str]]) -> list[Path]:
         track_paths: list[Path] = []
         for track_entry in tracks_data:
             if "query" in track_entry:
@@ -158,10 +149,7 @@ class CDParser:
                 playlist_path = Path(track_entry["playlist"])
                 playlist_tracks = self._get_tracks_from_playlist(playlist_path)
                 track_paths.extend(playlist_tracks)
-
-        # Convert found track paths into AudioTracks
-        tracks = [AudioTrack(track_path, cd_path, population_mode) for track_path in track_paths]
-        return AudioCD(cd_path, tracks, self.executor)
+        return track_paths
 
     def _get_tracks_from_query(self, query: str) -> list[Path]:
         parsed_query, _ = parse_query_string(query, Item)
@@ -169,6 +157,7 @@ class CDParser:
         return [item.filepath for item in items]
 
     def _get_tracks_from_playlist(self, playlist_path: Path) -> list[Path]:
+        playlist_path = playlist_path.expanduser()
         if not playlist_path.is_file() and not playlist_path.is_symlink():
             raise ValueError(f"Provided playlist path `{playlist_path}` is not a file!")
 
@@ -186,7 +175,6 @@ class CDParser:
             else:
                 resolved_path = (playlist_path.parent / track_path).resolve()
             if not resolved_path.exists():
-                sys.stderr.write(f"Playlist at `{playlist_path}` references missing track `{resolved_path}`")
-                continue
+                raise ValueError(f"Playlist at `{playlist_path}` references missing track `{resolved_path}`")
             paths.append(resolved_path)
         return paths

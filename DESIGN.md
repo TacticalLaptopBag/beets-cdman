@@ -32,26 +32,27 @@ cd-name_1:
   bitrate: 128  # optional, defaults to user config
   folders:
     __root__:
-      query: "'artist:Daft Punk'"
+      - query: "'artist:Daft Punk'"
     folder_1:
-      name: "Folder 1"
-      queries:
-        - "'Life in a Bubble I Blew'"
+      name: "Folder 1"  # optional, defaults to property key
+      tracks:
+        - query: "'Life in a Bubble I Blew'"
     folder_2:
       name: "Folder 2"
-      playlist: "/path/to/playlist.m3u"
+      tracks:
+        - playlist: "/path/to/playlist.m3u"
     folder_3:
       name: "Folder 3"
-      playlists:
-        - "/path/to/playlist.m3u"
-        - "relative/to/def_file/playlist.m3u"
+      tracks:
+        - playlist: "/path/to/playlist.m3u"
+        - playlist: "relative/to/def_file/playlist.m3u"
 
 # Audio CD
 cd-name_2:
   type: audio
-  population_mode: soft_link  # optional, defaults to user config
-  # population_mode: hard_link
-  # population_mode: copy
+  populate_mode: soft_link  # optional, defaults to user config
+  # populate_mode: hard_link
+  # populate_mode: copy
   tracks:
     - query: "'artist:Foals' 'album:What Went Down'"
     - playlist: "/path/to/playlist.m3u"
@@ -63,7 +64,7 @@ cdman:
   path: ~/Music/CDs
   threads: 8  # optional, defaults to hardware thread count
   mp3_bitrate: 128  # optional, defaults to 128
-  audio_population_mode: copy  # optional, defaults to copy
+  audio_populate_mode: copy  # optional, defaults to copy
   cd_files:  # optional
     - ~/Music/CD Defs/cd1.yml
     - relative/to/home/cd2.yml
