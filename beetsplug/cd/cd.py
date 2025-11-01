@@ -19,7 +19,7 @@ def _rm_job(path: Path):
 
     if not Config.dry:
         os.remove(path)
-    Stats.track_removed()
+    Stats.delete_track()
 
 
 def _mv_job(src_path: Path, dst_path: Path):
@@ -28,7 +28,7 @@ def _mv_job(src_path: Path, dst_path: Path):
     
     if not Config.dry:
         src_path.rename(dst_path)
-    Stats.track_moved()
+    Stats.move_track()
 
 
 class CDSplit:

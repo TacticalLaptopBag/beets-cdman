@@ -18,7 +18,7 @@ def _rmdir_job(path: Path):
 
     if not Config.dry:
         shutil.rmtree(path)
-    Stats.folder_removed()
+    Stats.delete_folder()
 
 
 def _mvdir_job(src_path: Path, dst_path: Path):
@@ -27,7 +27,7 @@ def _mvdir_job(src_path: Path, dst_path: Path):
 
     if not Config.dry:
         src_path.rename(dst_path)
-    Stats.folder_moved()
+    Stats.move_folder()
 
 
 class MP3CD(CD):

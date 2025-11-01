@@ -36,7 +36,7 @@ class AudioTrack(CDTrack):
             skip = skip or (self._populate_mode == AudioPopulateMode.HARD_LINK and is_hard_link)
             skip = skip or (self._populate_mode == AudioPopulateMode.COPY and self._dst_path.is_file() and not is_hard_link)
             if skip:
-                Stats.track_skipped()
+                Stats.skip_track()
                 if Config.verbose:
                     print(f"Skipped {self._dst_path}")
                 return
@@ -45,10 +45,11 @@ class AudioTrack(CDTrack):
                 os.remove(self._dst_path)
             if Config.verbose:
                 print(f"Removed {self._dst_path} -- populate mode has changed.")
-            Stats.track_removed()
+            Stats.delete_track()
 
         self.dst_directory.mkdir(parents=True, exist_ok=True)
         verbose_format = f"{{}} {self._src_path} to {self._dst_path}"
+        Stats.populating_track()
         try:
             match self._populate_mode:
                 case AudioPopulateMode.SOFT_LINK:
@@ -67,11 +68,11 @@ class AudioTrack(CDTrack):
                     if not Config.dry:
                         shutil.copy2(self._src_path, self._dst_path)
                 case _:
-                    Stats.track_failed()
-                    raise RuntimeError("Invalid populate_mode")
-            Stats.track_populated()
+                    Stats.fail_track()
+                    raise ValueError("Invalid populate_mode")
+            Stats.populate_track()
         except OSError:
-            Stats.track_failed()
+            Stats.fail_track()
 
     @override
     def __len__(self):

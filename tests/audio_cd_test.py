@@ -131,7 +131,7 @@ def test_cleanup(cds):
         shutil.copy2(track1_path, extra_path)
         cd.cleanup()
         cd._executor.wait()
-        assert Stats.tracks_removed == 1
+        assert Stats.tracks_deleted == 1
         assert not extra_path.exists()
         Stats.reset()
 
@@ -157,7 +157,7 @@ def test_cleanup(cds):
         track3_path.rename(track3_renamed)
         cd.cleanup()
         cd._executor.wait()
-        assert Stats.tracks_removed == 1
+        assert Stats.tracks_deleted == 1
         assert Stats.tracks_moved == 2
         assert not extra_path.exists()
         assert track2_path.exists()
@@ -175,7 +175,7 @@ def test_cleanup_with_duplicates(dup_cd):
 
         dup_cd.cleanup()
         assert Stats.tracks_moved == 0
-        assert Stats.tracks_removed == 0
+        assert Stats.tracks_deleted == 0
 
 
 def test_calculate_splits(cds):

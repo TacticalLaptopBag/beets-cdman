@@ -32,15 +32,16 @@ class MP3Track(CDTrack):
                     # Track already exists and has matching bitrate, skip
                     if Config.verbose:
                         print(f"Skipped {self._dst_path}")
-                    Stats.track_skipped()
+                    Stats.skip_track()
                     return
         self._dst_path.parent.mkdir(parents=True, exist_ok=True)
 
+        Stats.populating_track()
         # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
         if Config.verbose:
             print(f"Converting {self._src_path} to {self._dst_path} ...")
         if Config.dry:
-            Stats.track_populated()
+            Stats.populate_track()
             return None
         
         result = subprocess.run(
@@ -67,9 +68,9 @@ class MP3Track(CDTrack):
                 stdout_log.write(result.stdout)
             with stderr_log_path.open("wb") as stderr_log:
                 stderr_log.write(result.stderr)
-            Stats.track_failed()
+            Stats.fail_track()
         else:
-            Stats.track_populated()
+            Stats.populate_track()
 
         return None
 

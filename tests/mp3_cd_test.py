@@ -185,7 +185,7 @@ def test_cleanup(cds):
         shutil.copy2(track1_path, extra_track_path)
         cd.cleanup()
         cd._executor.wait()
-        assert Stats.tracks_removed == 1
+        assert Stats.tracks_deleted == 1
         assert track1_path.exists()
         assert not extra_track_path.exists()
         Stats.reset()
@@ -211,7 +211,7 @@ def test_cleanup(cds):
         shutil.copytree(folder1_path, extra_folder_path)
         cd.cleanup()
         cd._executor.wait()
-        assert Stats.folders_removed == 1
+        assert Stats.folders_deleted == 1
         assert folder1_path.exists()
         assert not extra_folder_path.exists()
         
@@ -239,9 +239,9 @@ def test_cleanup(cds):
         folder2_path.rename(folder2_renamed)
         cd.cleanup()
         cd._executor.wait()
-        assert Stats.tracks_removed == 1
+        assert Stats.tracks_deleted == 1
         assert Stats.tracks_moved == 2
-        assert Stats.folders_removed == 1
+        assert Stats.folders_deleted == 1
         assert Stats.folders_moved == 2
         assert folder1_path.exists()
         assert folder2_path.exists()
@@ -263,9 +263,9 @@ def test_cleanup_with_duplicates(dup_cd):
 
         dup_cd.cleanup()
         assert Stats.tracks_moved == 0
-        assert Stats.tracks_removed == 0
+        assert Stats.tracks_deleted == 0
         assert Stats.folders_moved == 0
-        assert Stats.folders_removed == 0
+        assert Stats.folders_deleted == 0
         for folder in dup_cd._folders:
             assert folder.path.exists()
 
