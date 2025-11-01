@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
-import math
 from pathlib import Path
-from typing import Optional, override
+from typing import Any, Optional, override
 import ffmpeg
 
 from beetsplug.util import unnumber_name
@@ -13,6 +12,8 @@ class CDTrack(ABC):
         self.dst_directory = dst_directory
         self._dst_path: Optional[Path] = None
         self._name = unnumber_name(src_path.stem)
+        self.__src_stream: Optional[Any] = None
+        self.__dst_stream: Optional[Any] = None
 
     @property
     def dst_path(self) -> Path:
@@ -27,6 +28,30 @@ class CDTrack(ABC):
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def _src_stream(self) -> Optional[Any]:
+        if self.__src_stream is None:
+            self.__src_stream = self._get_stream(self.src_path)
+
+        return self.__src_stream
+
+    @property
+    def _dst_stream(self) -> Optional[Any]:
+        if self.__dst_stream is None:
+            self.__dst_stream = self._get_stream(self.dst_path)
+
+        return self.__dst_stream
+
+    @classmethod
+    def _get_stream(cls, path: Path) -> Any:
+        try:
+            probe = ffmpeg.probe(str(path))
+        except ffmpeg.Error:
+            return None
+
+        stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
+        return stream
 
     @abstractmethod
     def _get_dst_extension(self) -> str:
@@ -54,17 +79,17 @@ class CDTrack(ABC):
             raise RuntimeError("set_dst_path must be run before get_size!")
         return self._dst_path.stat().st_size
 
-    @classmethod
-    def get_duration(cls, path: Path) -> float:
+    def get_duration(self, path: Path) -> float:
         if not path.exists():
             return 0.0
 
-        try:
-            probe = ffmpeg.probe(str(path))
-        except ffmpeg.Error:
-            return 0.0
+        if path == self.src_path:
+            stream = self._src_stream
+        elif path == self.dst_path:
+            stream = self._dst_stream
+        else:
+            stream = self._get_stream(path)
 
-        stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
         if stream is None:
             return 0.0
 
