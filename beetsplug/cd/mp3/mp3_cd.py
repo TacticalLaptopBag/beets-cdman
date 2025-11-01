@@ -45,7 +45,7 @@ class MP3CD(CD):
         return 735_397_888
 
     @override
-    def cleanup(self):
+    def _cleanup(self):
         if not self._path.exists(): return
         for existing_path in self._path.iterdir():
             if not existing_path.is_dir():
@@ -72,7 +72,7 @@ class MP3CD(CD):
                     break
 
         for folder in self._folders:
-            self._cleanup_path(folder.path, folder._tracks)
+            self._executor.submit(self._cleanup_path, folder.path, folder._tracks)
         return None
 
     @override

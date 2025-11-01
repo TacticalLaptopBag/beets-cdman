@@ -22,7 +22,7 @@ class AudioCD(CD):
         return 80 * 60
 
     @override
-    def cleanup(self):
+    def _cleanup(self):
         self._cleanup_path(self._path, self._tracks)
 
     @override

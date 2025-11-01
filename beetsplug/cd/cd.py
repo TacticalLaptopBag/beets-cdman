@@ -57,8 +57,11 @@ class CD(ABC):
     def max_size(self) -> float:
         raise RuntimeError("max_size is not overridden!")
 
-    @abstractmethod
     def cleanup(self):
+        self._executor.submit(self._cleanup)
+
+    @abstractmethod
+    def _cleanup(self):
         pass
 
     def _cleanup_path(self, path: Path, tracks: Sequence[CDTrack]):
