@@ -77,5 +77,8 @@ class MP3CD(CD):
     @override
     def numberize(self):
         folder_count = len(self._folders)
-        for i, folder in enumerate(self._folders):
-            folder.numberize(i+1, folder_count)
+        folder_number = 1
+        for folder in self._folders:
+            folder.numberize(folder_number, folder_count)
+            if not folder.is_root:
+                folder_number += 1
