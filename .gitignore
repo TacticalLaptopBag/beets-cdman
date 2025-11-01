@@ -202,3 +202,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+*.old
+*.bkp
+
+# Test CD files
+cds/
+cd_defs/

@@ -42,12 +42,19 @@ class DimensionalThreadPoolExecutor:
         for _ in range(self._max_workers):
             self._executor.submit(self._task_loop)
 
+    @property
+    def max_workers(self) -> int:
+        return self._max_workers
+
     def submit(self, fn: Callable, /, *args, **kwargs):
         self._tasks.put_nowait(_Task(fn, args, kwargs))
 
-    def shutdown(self):
-        # Wait for all tasks to complete, including any that get submitted after this shutdown call
+    def wait(self):
+        # Wait for all tasks to complete, including any that get submitted after this wait call
         self._tasks.join()
+
+    def shutdown(self):
+        self.wait()
 
         # Signal task loops that they're done
         for _ in range(self._max_workers):

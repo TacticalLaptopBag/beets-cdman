@@ -1,0 +1,154 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.2.8 Chrome/140.0.7339.240 Electron/38.4.0 Safari/537.36" version="28.2.8">
+  <diagram name="Page-1" id="1r7w98-12CN5211z5Hhf">
+    <mxGraphModel dx="1009" dy="766" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-4" target="ZhEklMnz4OzxkwiI9wZ6-5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-4" value="User runs cdman" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_1;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="300" y="50" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-5" target="ZhEklMnz4OzxkwiI9wZ6-6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-5" value="Read config" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="320" y="180" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-6" value="Override config with CLI options" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="320" y="280" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-8" target="ZhEklMnz4OzxkwiI9wZ6-18" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-8" value="Read CD definitions from config" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="130" y="550" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-9" target="ZhEklMnz4OzxkwiI9wZ6-18" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-9" value="Read CD definitions from paths provided" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="500" y="550" width="100" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;endArrow=none;endFill=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-8" target="ZhEklMnz4OzxkwiI9wZ6-7" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="180" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;startArrow=classic;startFill=1;endArrow=none;endFill=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-9" target="ZhEklMnz4OzxkwiI9wZ6-7" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-14" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="235" y="380" width="265" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-7" value="Did user provide CD definition paths?" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" parent="ZhEklMnz4OzxkwiI9wZ6-14" vertex="1">
+          <mxGeometry x="60" width="150" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-12" value="No" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" parent="ZhEklMnz4OzxkwiI9wZ6-14" vertex="1">
+          <mxGeometry y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-13" value="Yes" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" parent="ZhEklMnz4OzxkwiI9wZ6-14" vertex="1">
+          <mxGeometry x="205" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-6" target="ZhEklMnz4OzxkwiI9wZ6-7" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-18" target="ZhEklMnz4OzxkwiI9wZ6-21" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-18" value="Check for already populated CDs" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="310" y="690" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-25" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-21" target="ZhEklMnz4OzxkwiI9wZ6-27" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="950" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-21" value="Populate missing tracks" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="320" y="820" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-26" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="235" y="960" width="265" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-27" value="Does populated CD fit into a physical CD?" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" parent="ZhEklMnz4OzxkwiI9wZ6-26" vertex="1">
+          <mxGeometry x="60" width="150" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-28" value="No" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" parent="ZhEklMnz4OzxkwiI9wZ6-26" vertex="1">
+          <mxGeometry y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-29" value="Yes" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" parent="ZhEklMnz4OzxkwiI9wZ6-26" vertex="1">
+          <mxGeometry x="205" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-35" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-30" target="ZhEklMnz4OzxkwiI9wZ6-34" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="140" y="1320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-30" value="Calculate where splits should be and make report" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="80" y="1140" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-27" target="ZhEklMnz4OzxkwiI9wZ6-30" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-34" value="Finish" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.terminator;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="320" y="1290" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-27" target="ZhEklMnz4OzxkwiI9wZ6-34" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="570" y="1020" />
+              <mxPoint x="570" y="1320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-38" value="Read CD Definition" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_1;whiteSpace=wrap;" parent="1" vertex="1">
+          <mxGeometry x="1212.5" y="50" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-39" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="1127" y="202" width="265" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-40" value="What type is the CD?" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.decision;whiteSpace=wrap;" parent="ZhEklMnz4OzxkwiI9wZ6-39" vertex="1">
+          <mxGeometry x="60" width="150" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-41" value="MP3" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" parent="ZhEklMnz4OzxkwiI9wZ6-39" vertex="1">
+          <mxGeometry y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-42" value="Audio" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" parent="ZhEklMnz4OzxkwiI9wZ6-39" vertex="1">
+          <mxGeometry x="205" y="30" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-38" target="ZhEklMnz4OzxkwiI9wZ6-40" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-44" value="Read from folders" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="1020" y="390" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-45" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-41" target="ZhEklMnz4OzxkwiI9wZ6-44" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1070" y="262" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-46" value="Read from tracks" style="rounded=1;whiteSpace=wrap;html=1;absoluteArcSize=1;arcSize=14;strokeWidth=2;" parent="1" vertex="1">
+          <mxGeometry x="1380" y="390" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ZhEklMnz4OzxkwiI9wZ6-47" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=1;exitDx=0;exitDy=0;" parent="1" source="ZhEklMnz4OzxkwiI9wZ6-42" target="ZhEklMnz4OzxkwiI9wZ6-46" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1430" y="262" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

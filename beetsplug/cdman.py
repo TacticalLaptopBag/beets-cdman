@@ -1,388 +1,244 @@
-import math
-import sys
-import shutil
-import os
-import re
-import psutil
-import subprocess
-import ffmpeg
-from typing import Iterable, Optional
-from beets.plugins import BeetsPlugin
-from beets.library import Library, parse_query_string, Item, Results
-from beets.ui import Subcommand
-from optparse import Values
+from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
-from confuse import RootView, YamlSource
-from more_itertools import divide
+from threading import Lock, Thread
+import psutil
+from typing import Optional, override
+from beets.plugins import BeetsPlugin
+from beets.ui import Subcommand
+from beets.library import Library, parse_query_string, Item
+from optparse import Values
 
-from .dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
-
-
-"""
-cdman:
-    cds_path: ~/Music/CDs
-    bitrate: 128
-    cds:
-        arcadian:
-            - dirname: The Arcadian Wild
-              query: album:"The Arcadian Wild"
-            - dirname: Welcome
-              query: album:"Welcome (Reframed)"
-"""
-
-CDDefinition = dict[str, list[dict[str, str]]]
-
-class CDFolder:
-    def __init__(self, item_dict: dict[str, str]):
-        self.dirname = item_dict["name"]
-        self.query = item_dict["query"]
-
-    def get_path(self, idx: int, cd_path: Path, total_count: int) -> Path:
-        padding = len(str(total_count))
-        padded_idx = str(idx + 1).rjust(padding, "0")
-        indexed_dirname = f"{padded_idx} {self.dirname}"
-        return cd_path / indexed_dirname
-
-    def __str__(self) -> str:
-        return f"{self.dirname}: {self.query}"
-
-
-class CD:
-    def __init__(self, path: Path):
-        self.path = path
-        self.folders: list[CDFolder] = []
-
-    def __str__(self) -> str:
-        folders = ""
-        for i, folder in enumerate(self.folders):
-            folders += str(folder)
-            if i != len(self.folders) - 1:
-                folders += ", "
-        return f"{self.path}: [{folders}]"
-
-    def find_folder_path(self, dirname: str) -> Optional[Path]:
-        """
-        Extracts the path of the folder from the given dirname,
-        and then returns the current dirname of that folder.
-        Example: "05 Lemaitre" would return "07 Lemaitre" if Lemaitre was moved to position 7.
-        It could return None if Lemaitre is not in this CD.
-        """
-        # First we need to extract the actual name from the given directory name
-        # Currently dirname is expected to be in the example format of "09 Folder"
-        name_regex = r"^\d+\s+(.*$)"
-        name_match = re.match(name_regex, dirname)
-        if name_match is None:
-            # dirname isn't in the expected format
-            return None
-
-        # Ignore the numbers, the capture group should be everything after
-        # the folder's position
-        folder_name = name_match.group(1)
-        if type(folder_name) != str:
-            # Something went wrong, maybe nothing was captured?
-            return None
-
-        # We now have the name of the folder,
-        # let's see if it's even in this CD
-        folder_idx = self.find_folder(folder_name)
-        if folder_idx == -1:
-            # Folder is not in CD
-            return None
-        folder = self.folders[folder_idx]
-        
-        # Folder is in CD, retrieve the path and return it
-        return folder.get_path(folder_idx, self.path, len(self.folders))
-
-    def has_folder(self, dirname: str) -> bool:
-        return self.find_folder(dirname) != -1
-
-    def find_folder(self, dirname: str) -> int:
-        """
-        Gets the index of the folder provided
-        """
-        for i, folder in enumerate(self.folders):
-            if folder.dirname == dirname:
-                return i
-        return -1
+from beetsplug.cd.cd import CD, CDSplit
+from beetsplug.cd_parser import CDParser
+from beetsplug.config import Config
+from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.printer import Printer
+from beetsplug.stats import Stats
 
 
 class CDManPlugin(BeetsPlugin):
-    def __init__(self, name: str | None = None):
+    def __init__(self, name: Optional[str] = None):
         super().__init__(name)
+
         hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
             "cds_path": "~/Music/CDs",
-            "bitrate": 128,
+            "bitrate": 192,
             "threads": hw_thread_count,
         })
+        self._summary_thread = Thread(
+            target=self._summary_thread_function,
+            name="Summary",
+        )
+        return None
 
-        self.bitrate = self.config["bitrate"].get(int)
-        self.max_threads: int = self.config["threads"].get(int) # pyright: ignore[reportAttributeAccessIssue]
-        if self.max_threads <= 0:
-            raise ValueError("Config field 'threads' must be a positive integer!")
-
+    @override
     def commands(self):
         return [self._get_subcommand()]
 
     def _get_subcommand(self):
-        cmd = Subcommand("cdman", help="manage MP3 CDs")
+        cmd = Subcommand("cdman", help="manage CDs")
         cmd.parser.add_option(
             "--threads", "-t",
-            help = 
-                "The maximum number of threads to use. " +
+            help="The maximum number of threads to use. " +
                 "This overrides the config value of the same name.",
             type=int,
         )
         cmd.parser.add_option(
             "--bitrate", "-b",
-            help = 
-                "The bitrate (in kbps) to use when converting files to MP3. " +
+            help="The bitrate (in kbps) to use when converting files to MP3. " +
                 "This overrides the config value of the same name.",
             type=int,
         )
         cmd.parser.add_option(
+            "--populate-mode", "-p",
+            help="Determines how Audio CDs are populated. "+
+                "Must be one of COPY, HARD_LINK, or SOFT_LINK. "+
+                "This overrides the config value of the same name.",
+            type=str,
+        )
+        cmd.parser.add_option(
             "--dry", "-d",
-            help =
-                "When run with this flag present, 'cdman' goes through "
+            help="When run with this flag present, 'cdman' goes through "
                 "all the motions of a normal command, but doesn't "
                 "actually perform any conversions. "
                 "Note that directories may be created in your cds_path directory.",
             action="store_true",
         )
         cmd.parser.add_option(
-            "--list-unused", "-l",
-            help = 
-                "Lists all tracks in your library that are not in any CD definitions.",
+            "--verbose", "-v",
+            help="Prints detailed output of what 'cdman' is currently doing.",
             action="store_true",
         )
+        cmd.parser.add_option(
+            "--list-unused", "-l",
+            help="Lists tracks in your beets library that are not found in any of your CDs",
+            action="store_true",
+        )
+        cmd.parser.add_option(
+            "--list-unused-paths", "-L",
+            help="Lists track paths in your beets library that were not found in any of your CDs "+
+                "This overrides --list-unused.",
+            action="store_true",
+        )
+
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
         cmd.func = cdman_cmd
         return cmd
 
+    def _get_duplicates(self, cds: list[CD]) -> set[str]:
+        cd_paths = set[Path]()
+        duplicates = set[str]()
+        for cd in cds:
+            if cd.path in cd_paths:
+                duplicates.add(cd.path.name)
+            cd_paths.add(cd.path)
+        return duplicates
+
     def _cmd(self, lib: Library, opts: Values, args: list[str]):
-        self.executor = DimensionalThreadPoolExecutor(self.max_threads)
-        
-        cds: list[CD]
+        max_threads: int = self.config["threads"].get(int) if opts.threads is None else opts.threads  # type: ignore
+        self._executor = DimensionalThreadPoolExecutor(max_threads)
+
+        Config.verbose = opts.verbose
+        Config.dry = opts.dry
+
+        cd_parser = CDParser(lib, opts, self.config, self._executor)
         if len(args) == 0:
-            cds = self._load_cds_from_config()
+            # Load CDs from config
+            cds = cd_parser.from_config()
         else:
-            cds = []
+            # Load CDs from args
+            cds: list[CD] = []
             for arg in args:
                 arg_path = Path(arg)
                 if not arg_path.exists():
                     print(f"No such file or directory: {arg_path}")
                     continue
-                cds.extend(self._load_cds_from_path(Path(arg)))
-        
-        if opts.threads is not None:
-            print(f"Overriding config value 'threads': using {opts.threads} instead of {self.max_threads}")
-            self.max_threads = opts.threads
+                arg_cds = cd_parser.from_path(arg_path)
+                cds.extend(arg_cds)
 
-        if opts.bitrate is not None:
-            print(f"Overriding config value 'bitrate': using {opts.bitrate} instead of {self.bitrate}")
-            self.bitrate = opts.bitrate
+        if len(cds) == 0:
+            print("No CD definitions found!")
+            self._executor.shutdown()
+            return None
 
-        self.dry = opts.dry
+        duplicates = self._get_duplicates(cds)
+        if len(duplicates) > 0:
+            print("Duplicate CD definitions found! Check your beets config and CD definition files for duplicate CD names.")
+            print(f"Duplicate CDs: {", ".join(duplicates)}")
+            self._executor.shutdown()
+            return None
 
-        if opts.list_unused:
-            self._list_unused(cds, lib)
+        if opts.list_unused or opts.list_unused_paths:
+            self._list_unused(lib, opts, cds)
         else:
-            self._populate_cds(cds, lib)
-
-        self.executor.shutdown()
-        return None
-
-    def _item_to_track_listing(self, item: Item) -> str:
-        return f"{item.get("artist")} - {item.get("album")} - {item.get("title")}"
-
-    def _list_unused(self, cds: list[CD], lib: Library):
-        unused_tracks = set([self._item_to_track_listing(item) for item in lib.items()])
-        removed_tracks: set[str] = set()
-        for cd in cds:
-            for folder in cd.folders:
-                folder_query, _ = parse_query_string(folder.query, Item)
-                folder_items = lib.items(folder_query)
-                for item in folder_items:
-                    track = self._item_to_track_listing(item)
-                    if track not in removed_tracks:
-                        unused_tracks.remove(track)
-                        removed_tracks.add(track)
-            
-        if len(unused_tracks) == 0:
-            print("No track has been left untouched.")
-            return None
-
-        print("Tracks not in any defined CD:")
-        for unused_track in unused_tracks:
-            print(unused_track)
-        return None
-
-    def _populate_cds(self, cds: list[CD], lib: Library):
-        for cd in cds:
-            # Find removed or reordered folders
-            if cd.path.exists():
-                for existing_path in cd.path.iterdir():
-                    if not existing_path.is_dir():
-                        continue
-
-                    # Existing CD folder found.
-                    new_path = cd.find_folder_path(existing_path.name)
-                    if new_path == existing_path:
-                        # Folder has not been removed or reordered
-                        continue
-
-                    if new_path is None:
-                        # Folder was not found in CD, must have been removed
-                        print(f"Found existing folder `{existing_path.name}` that is no longer in CD `{cd.path.name}`. This folder will be removed.")
-                        self.executor.submit(shutil.rmtree, existing_path)
-                        continue
-
-                    # Folder was found in CD, but at a different position
-                    print(f"Existing folder `{existing_path.name}` has been reordered, renaming to `{new_path}`.")
-                    self.executor.submit(os.rename, existing_path, new_path)
-
-            # Convert
-            for i, folder in enumerate(cd.folders):
-                query, _ = parse_query_string(folder.query, Item)
-                folder_path = folder.get_path(i, cd.path, len(cd.folders))
-                folder_path.mkdir(parents=True, exist_ok=True)
-                items = lib.items(query)
-                self._clean_folder(items, folder_path)
-                self._convert_folder(items, folder_path)
-        return None
-
-    def _get_song_length(self, path: Path) -> float:
-        try:
-            probe = ffmpeg.probe(str(path))
-        except ffmpeg.Error:
-            return 0.0
-
-        stream = next((stream for stream in probe["streams"] if stream["codec_type"] == "audio"), None)
-        if stream is None:
-            return 0.0
-
-        duration = float(stream["duration"])
-        return duration
-
-    def _clean_folder(self, items: Iterable[Item], folder_path: Path):
-        converted_paths: list[Path] = [folder_path / (item.filepath.stem + ".mp3") for item in items]
-
-        for path in folder_path.iterdir():
-            if path.suffix != ".mp3":
-                continue
-            if not path.is_file():
-                continue
-
-            if path not in converted_paths:
-                print(f"Found removed file `{path}`. This file will be removed.")
-                self.executor.submit(os.remove, path)
-
-    def _convert_folder(self, items: Iterable[Item], folder_path: Path):
-        for items_chunk in divide(self.max_threads, items):
-            self.executor.submit(self._convert_folder_chunk, items_chunk, folder_path)
-        return None
-
-    def _convert_folder_chunk(self, items: Iterable[Item], folder_path: Path):
-        for item in items:
-            converted_path = folder_path / (item.filepath.stem + ".mp3")
-            if converted_path.exists():
-                if converted_path.is_file():
-                    converted_duration = math.ceil(self._get_song_length(converted_path))
-                    orig_duration = math.ceil(self._get_song_length(item.filepath))
-                    if abs(converted_duration - orig_duration) > 1:
-                        print(f"Found partially converted file `{converted_path}`. This file will be reconverted.")
-                        os.remove(converted_path)
-                    else:
-                        print(f"Skipping `{item.filepath.name}` as it is already in {folder_path}")
-                        continue
-                else:
-                    print(f"FATAL: {converted_path} already exists, but it isn't a file!")
-                    print("Unsure how to proceed, you should probably manually intervene here.")
-                    exit(1)
-
-            def job(src_file: Path, dest_file: Path):
-                print(f"Converting `{src_file.name}` to {self.bitrate}K MP3 in {dest_file.parent}")
-                self._convert_file(src_file, dest_file)
-
-            self.executor.submit(job, item.filepath, converted_path)
-        return None
-
-    def _convert_file(self, file: Path, dest_file: Path):
-        # TODO: convert plugin? 🥺👉👈
-        # ffmpeg -i "$flac_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a 128k -vn "$output_file"
-        if self.dry:
-            return None
+            self._populate(cds)
         
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-i", str(file),
-                "-hide_banner",
-                "-acodec", "libmp3lame",
-                "-ar", "44100",
-                "-b:a", f"{self.bitrate}k",
-                "-vn", str(dest_file)
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        if result.returncode != 0:
-            sys.stderr.write(f"Error converting `{file}`! Look in `{dest_file.parent}` for ffmpeg logs.\n")
-            stdout_log_path = dest_file.with_suffix(".stdout.log")
-            stderr_log_path = dest_file.with_suffix(".stderr.log")
-            with stdout_log_path.open("wb") as stdout_log:
-                stdout_log.write(result.stdout)
-            with stderr_log_path.open("wb") as stderr_log:
-                stderr_log.write(result.stderr)
-
         return None
 
-    def _load_cds_from_config(self) -> list[CD]:
-        if "cds" not in self.config:
-            print(
-                "No CDs defined in config! "
-                "Either add CDs in your beets config file or create "
-                "CD definition files and pass them as arguments."
-            )
-            return []
+    def _list_unused(self, lib: Library, opts: Values, cds: list[CD]):
+        cd_track_paths = set([track.src_path for cd in cds for track in cd.get_tracks()])
 
-        conf_cds: CDDefinition = self.config["cds"].get(dict) # pyright: ignore[reportAssignmentType]
-        cds = self._load_cds(conf_cds)
-        return cds
-    
-    def _load_cds_from_path(self, path: Path) -> list[CD]:
-        if path.is_dir():
-            child_cds: list[CD] = []
-            for child in path.iterdir():
-                child_cds.extend(self._load_cds_from_path(child))
-            return child_cds
+        parsed_query, _ = parse_query_string("", Item)
+        items = lib.items(parsed_query)
+        for item in items:
+            if item.filepath in cd_track_paths:
+                continue
 
-        if not path.is_file():
-            return []
-        if path.suffix != ".yml":
-            return []
+            if opts.list_unused_paths:
+                print(item.filepath)
+            else:
+                print(f"{item.get("artist")} - {item.get("album")} - {item.get("title")}")
+            
+        self._executor.shutdown()
+        return None
 
-        try:
-            config = RootView([YamlSource(str(path))])
-            cds_dict: CDDefinition = config.get(dict) # pyright: ignore[reportAssignmentType]
-            cds = self._load_cds(cds_dict)
-            return cds
-        except:
-            print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
-            return []
-    
-    def _load_cds(self, cd_data: CDDefinition) -> list[CD]:
-        cds_path = Path(self.config["cds_path"].get(str)).expanduser() # pyright: ignore[reportArgumentType]
-        cds: list[CD] = []
+    def _populate(self, cds: list[CD]):
+        self._summary_thread.start()
 
-        for cd_name in cd_data:
-            cd = CD(cds_path / cd_name)
-            cd_folders_data = cd_data[cd_name]
-            for cd_folder_data in cd_folders_data:
-                cd_folder = CDFolder(cd_folder_data)
-                cd.folders.append(cd_folder)
-            cds.append(cd) 
+        cd_splits: dict[CD, Sequence[CDSplit]] = {}
+        cd_splits_lock = Lock()
+        def split_job(cd: CD):
+            splits = cd.calculate_splits()
+            with cd_splits_lock:
+                cd_splits[cd] = splits
 
-        return cds
-    
+        with self._executor:
+            for cd in cds:
+                cd.numberize()
+                cd.cleanup()
+                cd.populate()
+
+            # Wait for all populates to finish before calculating splits
+            if not Config.dry:
+                self._executor.wait()
+                Stats.set_calculating()
+                for cd in cds:
+                    self._executor.submit(split_job, cd)
+
+        Stats.set_done()
+        self._summary_thread.join()
+
+        for cd in cd_splits:
+            splits = cd_splits[cd]
+            if len(splits) > 1:
+                print(f"`{cd.path.name}` is too big to fit on one CD! It must be split across multiple CDs like so:")
+                for i, split in enumerate(splits):
+                    print(f"\t({i+1}/{len(splits)}): {split.start.dst_path.name} -- {split.end.dst_path.name}")
+        return None
+
+    def _summary_thread_function(self):
+        p = Printer()
+        spinner = ["-", "\\", "|", "/"]
+        dancing_dots = [".", "..", " ..", "  ..", "   ..", "    .", "    .", "   ..", "  ..", " ..", "..", "."]
+        ellipses = ["", ".", ".", "..", "..", "...", "...", "...", "..."]
+
+        current_indicator = 0
+        indicator_time = 0.1 if not Config.verbose else None
+        last_check = datetime.now().timestamp()
+        while True:
+            with Stats.changed_cond:
+                Stats.changed_cond.wait(indicator_time)
+
+            if Stats.is_calculating:
+                indicator = ellipses
+            elif Stats.tracks_populating > 0:
+                indicator = spinner
+            else:
+                indicator = dancing_dots
+
+            if indicator_time is not None:
+                if datetime.now().timestamp() - last_check >= indicator_time:
+                    current_indicator += 1
+                    last_check = datetime.now().timestamp()
+            current_indicator = current_indicator % len(indicator)
+
+            with Stats.lock:
+                if Config.verbose and not Stats.is_done:
+                    continue
+
+                p.print_line(1, f"Found CDs: {Stats.cds}")
+
+                p.print_line(3, f"Tracks populated: {Stats.tracks_populated}")
+                p.print_line(4, f"Tracks skipped: {Stats.tracks_skipped}")
+                p.print_line(5, f"Tracks deleted: {Stats.tracks_deleted}")
+                p.print_line(6, f"Tracks moved: {Stats.tracks_moved}")
+                p.print_line(7, f"Tracks failed: {Stats.tracks_failed}")
+                p.print_line(8, f"Folders deleted: {Stats.folders_deleted}")
+                p.print_line(9, f"Folders moved: {Stats.folders_moved}")
+
+                if not Config.verbose:
+                    if Stats.is_calculating:
+                        msg = f"Checking CD sizes{indicator[current_indicator]}"
+                    else:
+                        if Stats.tracks_populating > 0:
+                            msg = f"Tracks populating: {Stats.tracks_populating} {indicator[current_indicator] * Stats.tracks_populating}"
+                        else:
+                            msg = f"Searching for tracks{indicator[current_indicator]}"
+                    p.print_line(11, msg)
+
+                if Stats.is_done:
+                    break
+        return None
