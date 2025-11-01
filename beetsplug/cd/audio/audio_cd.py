@@ -17,6 +17,10 @@ class AudioCD(CD):
         self._tracks = tracks
         self._executor = executor
 
+    @CD.pretty_type.getter
+    def pretty_type(self) -> str:
+        return "Audio"
+
     @CD.max_size.getter
     def max_size(self) -> float:
         return 80 * 60

@@ -13,6 +13,7 @@ from beetsplug.cd.mp3.mp3_folder import MP3Folder
 from beetsplug.cd.mp3.mp3_track import MP3Track
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
 from beetsplug.m3uparser import parsem3u
+from beetsplug.stats import Stats
 
 
 class CDParser:
@@ -52,7 +53,7 @@ class CDParser:
         if not path.is_file() and not path.is_symlink():
             return []
 
-        if path.suffix != ".yml":
+        if path.suffix != ".yml" and path.suffix != ".yaml":
             return []
         
         try:
@@ -111,7 +112,10 @@ class CDParser:
                 mp3_tracks,
             )
             cd_folders.append(folder)
-        return MP3CD(cd_path, cd_folders, self.executor)
+
+        cd = MP3CD(cd_path, cd_folders, self.executor)
+        Stats.found_cd(cd.path.name, cd.pretty_type)
+        return cd
 
     def _parse_audio_data(self, view: Subview) -> CD:
         cd_path = self.cds_path / view.key
@@ -136,7 +140,9 @@ class CDParser:
 
         # Convert found track paths into AudioTracks
         tracks = [AudioTrack(track_path, cd_path, populate_mode) for track_path in track_paths]
-        return AudioCD(cd_path, tracks, self.executor)
+        cd = AudioCD(cd_path, tracks, self.executor)
+        Stats.found_cd(cd.path.name, cd.pretty_type)
+        return cd
     
     def _parse_tracks(self, tracks_data: list[OrderedDict[str, str]]) -> list[Path]:
         track_paths: list[Path] = []

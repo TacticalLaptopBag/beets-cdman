@@ -50,6 +50,10 @@ class CD(ABC):
         self._test_size = -1
 
     @property
+    def pretty_type(self) -> str:
+        raise RuntimeError("pretty_type is not overridden!")
+
+    @property
     def path(self) -> Path:
         return self._path
 

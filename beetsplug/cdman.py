@@ -160,13 +160,16 @@ class CDManPlugin(BeetsPlugin):
             with Stats.lock:
                 if Config.verbose and not Stats.is_done:
                     continue
-                p.print_line(1, f"Tracks populated: {Stats.tracks_populated}")
-                p.print_line(2, f"Tracks skipped: {Stats.tracks_skipped}")
-                p.print_line(3, f"Tracks deleted: {Stats.tracks_deleted}")
-                p.print_line(4, f"Tracks moved: {Stats.tracks_moved}")
-                p.print_line(5, f"Tracks failed: {Stats.tracks_failed}")
-                p.print_line(6, f"Folders deleted: {Stats.folders_deleted}")
-                p.print_line(7, f"Folders moved: {Stats.folders_moved}")
+
+                p.print_line(1, f"Found CDs: {Stats.cds}")
+
+                p.print_line(3, f"Tracks populated: {Stats.tracks_populated}")
+                p.print_line(4, f"Tracks skipped: {Stats.tracks_skipped}")
+                p.print_line(5, f"Tracks deleted: {Stats.tracks_deleted}")
+                p.print_line(6, f"Tracks moved: {Stats.tracks_moved}")
+                p.print_line(7, f"Tracks failed: {Stats.tracks_failed}")
+                p.print_line(8, f"Folders deleted: {Stats.folders_deleted}")
+                p.print_line(9, f"Folders moved: {Stats.folders_moved}")
 
                 if not Config.verbose:
                     if Stats.is_calculating:
@@ -176,7 +179,7 @@ class CDManPlugin(BeetsPlugin):
                             msg = f"Tracks populating: {Stats.tracks_populating} {indicator[current_indicator] * Stats.tracks_populating}"
                         else:
                             msg = f"Searching for tracks{indicator[current_indicator]}"
-                    p.print_line(9, msg)
+                    p.print_line(11, msg)
 
                 if Stats.is_done:
                     break

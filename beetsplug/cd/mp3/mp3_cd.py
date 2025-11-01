@@ -40,6 +40,10 @@ class MP3CD(CD):
         super().__init__(path, executor)
         self._folders = folders
 
+    @CD.pretty_type.getter
+    def pretty_type(self) -> str:
+        return "MP3"
+
     @CD.max_size.getter
     def max_size(self) -> float:
         return 735_397_888
