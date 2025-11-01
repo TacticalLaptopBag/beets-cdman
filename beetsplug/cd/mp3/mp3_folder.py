@@ -37,7 +37,7 @@ class MP3Folder:
         if not self.is_root:
             digit_length = max(2, len(str(folder_count)))
             numbered = str(folder_number).zfill(digit_length)
-            self._path = self._path.parent / f"{numbered} {self._path.stem}"
+            self._path = self._path.parent / f"{numbered} {self._path.name}"
 
         track_count = len(self._tracks)
         for i, track in enumerate(self._tracks):
