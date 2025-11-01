@@ -42,6 +42,7 @@ class MP3Track(CDTrack):
         result = subprocess.run(
             [
                 "ffmpeg",
+                "-y",
                 "-i", str(self._src_path),
                 "-hide_banner",
                 "-acodec", "libmp3lame",
