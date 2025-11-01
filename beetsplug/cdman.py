@@ -42,7 +42,7 @@ class CDManPlugin(BeetsPlugin):
             type=int,
         )
         cmd.parser.add_option(
-            "--population-mode", "-p",
+            "--populate-mode", "-p",
             help="Determines how Audio CDs are populated. "+
                 "Must be one of COPY, HARD_LINK, or SOFT_LINK. "+
                 "This overrides the config value of the same name.",
