@@ -71,6 +71,19 @@ def cds(executor) -> list[MP3CD]:
                         ),
                     ],
                 ),
+                MP3Folder(
+                    cd_path / "cd_2" / "__root__",
+                    [
+                        MP3Track(
+                            music_path / "A Kind Of Hope.ogg",
+                            128,
+                        ),
+                        MP3Track(
+                            music_path / "Horizons.flac",
+                            128,
+                        )
+                    ]
+                )
             ],
             executor,
         ),
@@ -88,7 +101,11 @@ def test_numberize(cds):
         for cd in cds:
             cd.numberize()
             for i, folder in enumerate(cd._folders):
-                assert folder.path.name == f"0{i+1} {folder.name}"
+                if folder.is_root:
+                    assert folder.name == "__root__"
+                    assert folder.path == cd.path
+                else:
+                    assert folder.path.name == f"0{i+1} {folder.name}"
                 for track in folder._tracks:
                     assert track.dst_path is not None
                     assert track.dst_directory == folder.path
