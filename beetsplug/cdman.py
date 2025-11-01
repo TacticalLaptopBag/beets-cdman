@@ -24,7 +24,7 @@ class CDManPlugin(BeetsPlugin):
         hw_thread_count = psutil.cpu_count() or 4
         self.config.add({
             "cds_path": "~/Music/CDs",
-            "bitrate": 128,
+            "bitrate": 192,
             "threads": hw_thread_count,
         })
         self._summary_thread = Thread(
