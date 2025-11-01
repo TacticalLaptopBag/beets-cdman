@@ -6,7 +6,7 @@ import psutil
 from typing import Optional, override
 from beets.plugins import BeetsPlugin
 from beets.ui import Subcommand
-from beets.library import Library
+from beets.library import Library, parse_query_string, Item
 from optparse import Values
 
 from beetsplug.cd.cd import CD, CDSplit
@@ -31,6 +31,7 @@ class CDManPlugin(BeetsPlugin):
             target=self._summary_thread_function,
             name="Summary",
         )
+        return None
 
     @override
     def commands(self):
@@ -70,6 +71,17 @@ class CDManPlugin(BeetsPlugin):
             help="Prints detailed output of what 'cdman' is currently doing.",
             action="store_true",
         )
+        cmd.parser.add_option(
+            "--list-unused", "-l",
+            help="Lists tracks in your beets library that are not found in any of your CDs",
+            action="store_true",
+        )
+        cmd.parser.add_option(
+            "--list-unused-paths", "-L",
+            help="Lists track paths in your beets library that were not found in any of your CDs "+
+                "This overrides --list-unused.",
+            action="store_true",
+        )
 
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
@@ -91,8 +103,6 @@ class CDManPlugin(BeetsPlugin):
 
         Config.verbose = opts.verbose
         Config.dry = opts.dry
-
-        self._summary_thread.start()
 
         cd_parser = CDParser(lib, opts, self.config, self._executor)
         if len(args) == 0:
@@ -121,13 +131,40 @@ class CDManPlugin(BeetsPlugin):
             self._executor.shutdown()
             return None
 
+        if opts.list_unused or opts.list_unused_paths:
+            self._list_unused(lib, opts, cds)
+        else:
+            self._populate(cds)
+        
+        return None
+
+    def _list_unused(self, lib: Library, opts: Values, cds: list[CD]):
+        cd_track_paths = set([track.src_path for cd in cds for track in cd.get_tracks()])
+
+        parsed_query, _ = parse_query_string("", Item)
+        items = lib.items(parsed_query)
+        for item in items:
+            if item.filepath in cd_track_paths:
+                continue
+
+            if opts.list_unused_paths:
+                print(item.filepath)
+            else:
+                print(f"{item.get("artist")} - {item.get("album")} - {item.get("title")}")
+            
+        self._executor.shutdown()
+        return None
+
+    def _populate(self, cds: list[CD]):
+        self._summary_thread.start()
+
         cd_splits: dict[CD, Sequence[CDSplit]] = {}
         cd_splits_lock = Lock()
         def split_job(cd: CD):
             splits = cd.calculate_splits()
             with cd_splits_lock:
                 cd_splits[cd] = splits
-            
+
         with self._executor:
             for cd in cds:
                 cd.numberize()
@@ -204,3 +241,4 @@ class CDManPlugin(BeetsPlugin):
 
                 if Stats.is_done:
                     break
+        return None
