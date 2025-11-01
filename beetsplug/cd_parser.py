@@ -174,8 +174,6 @@ class CDParser:
 
         if playlist_path.suffix == ".m3u":
             return self._get_tracks_from_m3u_playlist(playlist_path)
-        if playlist_path.suffix == ".xspf":
-            return self._get_tracks_from_xspf_playlist(playlist_path)
         raise ValueError(f"Provided playlist file `{playlist_path}` is unsupported!")
 
     def _get_tracks_from_m3u_playlist(self, playlist_path: Path) -> list[Path]:
@@ -190,24 +188,5 @@ class CDParser:
             if not resolved_path.exists():
                 sys.stderr.write(f"Playlist at `{playlist_path}` references missing track `{resolved_path}`")
                 continue
-            paths.append(resolved_path)
-        return paths
-
-    def _get_tracks_from_xspf_playlist(self, playlist_path: Path) -> list[Path]:
-        playlist = Playlist(str(playlist_path))
-        paths: list[Path] = []
-        for track in playlist.trackList:
-            track_path: Optional[Path] = None
-            for location in track.location:
-                location_path = Path(location)
-                if location_path.exists():
-                    track_path = location_path
-            if track_path is None:
-                sys.stderr.write(f"Playlist at `{playlist_path}` references missing track `{track.location}")
-                continue
-            if track_path.is_absolute():
-                resolved_path = track_path.resolve()
-            else:
-                resolved_path = (playlist_path.parent / track_path).resolve()
             paths.append(resolved_path)
         return paths
