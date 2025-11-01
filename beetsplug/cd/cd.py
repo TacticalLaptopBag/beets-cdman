@@ -62,6 +62,7 @@ class CD(ABC):
         pass
 
     def _cleanup_path(self, path: Path, tracks: Sequence[CDTrack]):
+        if not path.exists(): return
         for existing_path in path.iterdir():
             if not existing_path.is_file() and not existing_path.is_symlink():
                 continue

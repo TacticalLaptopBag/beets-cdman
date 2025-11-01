@@ -46,6 +46,7 @@ class MP3CD(CD):
 
     @override
     def cleanup(self):
+        if not self._path.exists(): return
         for existing_path in self._path.iterdir():
             if not existing_path.is_dir():
                 continue
