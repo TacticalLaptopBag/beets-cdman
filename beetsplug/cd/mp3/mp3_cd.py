@@ -9,8 +9,6 @@ from beetsplug.util import unnumber_name
 from beetsplug.cd.cd import CD
 from beetsplug.cd.mp3.mp3_folder import MP3Folder
 
-# TODO: __root__ folder should go to CD root!
-
 
 def _rmdir_job(path: Path):
     if Config.verbose:
