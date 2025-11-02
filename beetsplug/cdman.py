@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import datetime
+import os
 from pathlib import Path
 from threading import Lock, Thread
 import psutil
@@ -186,7 +187,12 @@ class CDManPlugin(BeetsPlugin):
             if len(splits) > 1:
                 print(f"`{cd.path.name}` is too big to fit on one CD! It must be split across multiple CDs like so:")
                 for i, split in enumerate(splits):
-                    print(f"\t({i+1}/{len(splits)}): {split.start.dst_path.name} -- {split.end.dst_path.name}")
+                    path_start = split.start.dst_path.name
+                    path_end = split.end.dst_path.name
+                    if cd.pretty_type == "MP3":
+                        path_start = f"{split.start.dst_path.parent.name}{os.path.sep}{path_start}"
+                        path_end = f"{split.end.dst_path.parent.name}{os.path.sep}{path_end}"
+                    print(f"\t({i+1}/{len(splits)}): {path_start} -- {path_end}")
         return None
 
     def _summary_thread_function(self):
