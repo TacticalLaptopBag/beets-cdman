@@ -17,6 +17,10 @@ from beetsplug.stats import Stats
 
 
 class CDParser:
+    """
+    Handles parsing CD definitions into CD objects
+    """
+
     def __init__(
         self,
         lib: Library,
@@ -31,11 +35,17 @@ class CDParser:
         self.executor = executor
     
     def from_config(self) -> list[CD]:
+        """
+        Loads CD definitions from the config
+        """
+
         cds: list[CD] = []
 
+        # Get CDs directly defined in the config file
         if "cds" in self.config:
             cds.extend(self._parse_data(self.config["cds"]))
 
+        # Get CDs defined in external files referenced in the config
         if "cd_files" in self.config:
             cd_files: list[str] = self.config["cd_files"].get(list) # type: ignore
             for cd_file in cd_files:
@@ -44,19 +54,30 @@ class CDParser:
         return cds
 
     def from_path(self, path: Path) -> list[CD]:
+        """
+        Loads CD definitions from a CD definition file, or directory containing CD definition files
+        """
+
         path = path.expanduser()
+
+        # If the path is a directory, check its contents for CD definitions
         if path.is_dir():
             cds: list[CD] = []
             for child in path.iterdir():
                 cds.extend(self.from_path(child))
+            return cds
 
+        # The path has already been confirmed to not be a directory,
+        # if it isn't a file or symlink, we shouldn't bother with it
         if not path.is_file() and not path.is_symlink():
             return []
 
+        # If the file isn't a YAML file, we shouldn't bother with it
         if path.suffix != ".yml" and path.suffix != ".yaml":
             return []
         
         try:
+            # Parse CD data found in the definition file
             view = RootView([YamlSource(str(path))])
             return self._parse_data(view)
         except:
@@ -64,6 +85,10 @@ class CDParser:
             return []
 
     def _parse_data(self, view: ConfigView) -> list[CD]:
+        """
+        Loads a top-level CD definition view
+        """
+        
         cds: list[CD] = []
         cd_names: list[str] = view.keys()
         for cd_name in cd_names:
@@ -78,6 +103,9 @@ class CDParser:
         return cds
 
     def _parse_mp3_data(self, view: Subview) -> CD:
+        """
+        Loads an MP3 CD from a CD definition view
+        """
         cd_path = self.cds_path / view.key
 
         # Determine bitrate
@@ -96,6 +124,7 @@ class CDParser:
             folder_view = folders_view[folder_key]
             track_paths: list[Path] = []
 
+            # Get folder name
             folder_name: str = folder_key # type: ignore
             if folder_key != "__root__" and "name" in folder_view:
                 folder_name = folder_view["name"].get(str) # type: ignore
@@ -118,9 +147,12 @@ class CDParser:
         return cd
 
     def _parse_audio_data(self, view: Subview) -> CD:
+        """
+        Loads an Audio CD from a CD definition view
+        """
         cd_path = self.cds_path / view.key
 
-        # Determine populate mode
+        # Determine the populate mode for this CD
         populate_mode = AudioPopulateMode.COPY
         if "audio_populate_mode" in self.config:
             pop_mode_str: str = self.config["audio_populate_mode"].get(str) # type: ignore
@@ -145,6 +177,9 @@ class CDParser:
         return cd
     
     def _parse_tracks(self, tracks_data: list[OrderedDict[str, str]]) -> list[Path]:
+        """
+        Gets track paths from a tracks view
+        """
         track_paths: list[Path] = []
         for track_entry in tracks_data:
             if "query" in track_entry:
@@ -158,11 +193,17 @@ class CDParser:
         return track_paths
 
     def _get_tracks_from_query(self, query: str) -> list[Path]:
+        """
+        Finds track paths from a beets query
+        """
         parsed_query, _ = parse_query_string(query, Item)
         items = self.lib.items(parsed_query)
         return [item.filepath for item in items]
 
     def _get_tracks_from_playlist(self, playlist_path: Path) -> list[Path]:
+        """
+        Finds track paths from a playlist file
+        """
         playlist_path = playlist_path.expanduser()
         if not playlist_path.is_file() and not playlist_path.is_symlink():
             raise ValueError(f"Provided playlist path `{playlist_path}` is not a file!")
@@ -172,6 +213,9 @@ class CDParser:
         raise ValueError(f"Provided playlist file `{playlist_path}` is unsupported!")
 
     def _get_tracks_from_m3u_playlist(self, playlist_path: Path) -> list[Path]:
+        """
+        Finds track paths from an M3U playlist
+        """
         tracks = parsem3u(str(playlist_path))
         paths: list[Path] = []
         for track in tracks:
