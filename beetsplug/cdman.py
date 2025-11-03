@@ -90,6 +90,9 @@ class CDManPlugin(BeetsPlugin):
         return cmd
 
     def _get_duplicates(self, cds: list[CD]) -> set[str]:
+        """
+        Finds duplicate CDs and returns their paths
+        """
         cd_paths = set[Path]()
         duplicates = set[str]()
         for cd in cds:
@@ -120,11 +123,13 @@ class CDManPlugin(BeetsPlugin):
                 arg_cds = cd_parser.from_path(arg_path)
                 cds.extend(arg_cds)
 
+        # Check if there's even any CDs to work with
         if len(cds) == 0:
             print("No CD definitions found!")
             self._executor.shutdown()
             return None
 
+        # Check if there are duplicate CD definitions
         duplicates = self._get_duplicates(cds)
         if len(duplicates) > 0:
             print("Duplicate CD definitions found! Check your beets config and CD definition files for duplicate CD names.")
@@ -132,6 +137,7 @@ class CDManPlugin(BeetsPlugin):
             self._executor.shutdown()
             return None
 
+        # Determine which subcommand is run
         if opts.list_unused or opts.list_unused_paths:
             self._list_unused(lib, opts, cds)
         else:
@@ -140,25 +146,34 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _list_unused(self, lib: Library, opts: Values, cds: list[CD]):
-        cd_track_paths = set([track.src_path for cd in cds for track in cd.get_tracks()])
+        """
+        Lists all tracks in the user's library that aren't used in any CDs
+        """
+        # While the executor wasn't used, neglecting to shut it down will result in an infinite hang
+        with self._executor:
+            cd_track_paths = set([track.src_path for cd in cds for track in cd.get_tracks()])
 
-        parsed_query, _ = parse_query_string("", Item)
-        items = lib.items(parsed_query)
-        for item in items:
-            if item.filepath in cd_track_paths:
-                continue
+            parsed_query, _ = parse_query_string("", Item)
+            items = lib.items(parsed_query)
+            for item in items:
+                if item.filepath in cd_track_paths:
+                    continue
 
-            if opts.list_unused_paths:
-                print(item.filepath)
-            else:
-                print(f"{item.get("artist")} - {item.get("album")} - {item.get("title")}")
-            
-        self._executor.shutdown()
+                # Either show the path or the default beet format for a track
+                if opts.list_unused_paths:
+                    print(item.filepath)
+                else:
+                    print(f"{item.get("artist")} - {item.get("album")} - {item.get("title")}")
         return None
 
     def _populate(self, cds: list[CD]):
+        """
+        Populates all CDs with their defined tracks
+        """
+        # Show the current status to the user
         self._summary_thread.start()
 
+        # Prepare splits
         cd_splits: dict[CD, Sequence[CDSplit]] = {}
         cd_splits_lock = Lock()
         def split_job(cd: CD):
@@ -167,21 +182,24 @@ class CDManPlugin(BeetsPlugin):
                 cd_splits[cd] = splits
 
         with self._executor:
+            # Populate CDs
             for cd in cds:
                 cd.numberize()
                 cd.cleanup()
                 cd.populate()
 
             # Wait for all populates to finish before calculating splits
+            self._executor.wait()
             if not Config.dry:
-                self._executor.wait()
                 Stats.set_calculating()
                 for cd in cds:
                     self._executor.submit(split_job, cd)
 
+        # Inform summary thread to exit
         Stats.set_done()
         self._summary_thread.join()
 
+        # Show user where CDs need to be split to fit on physical CDs.
         for cd in cd_splits:
             splits = cd_splits[cd]
             if len(splits) > 1:
@@ -196,7 +214,12 @@ class CDManPlugin(BeetsPlugin):
         return None
 
     def _summary_thread_function(self):
+        """
+        Shows the user the current state of populating
+        """
         p = Printer()
+
+        # Loading indicators
         spinner = ["-", "\\", "|", "/"]
         dancing_dots = [".", "..", " ..", "  ..", "   ..", "    .", "    .", "   ..", "  ..", " ..", "..", "."]
         ellipses = ["", ".", ".", "..", "..", "...", "...", "...", "..."]
@@ -206,8 +229,10 @@ class CDManPlugin(BeetsPlugin):
         last_check = datetime.now().timestamp()
         while True:
             with Stats.changed_cond:
+                # Timeout with indicator time
                 Stats.changed_cond.wait(indicator_time)
 
+            # Determine which loading indicator to use
             if Stats.is_calculating:
                 indicator = ellipses
             elif Stats.tracks_populating > 0:
@@ -215,13 +240,16 @@ class CDManPlugin(BeetsPlugin):
             else:
                 indicator = dancing_dots
 
+            # Determine whether the loading indicator should step or not
             if indicator_time is not None:
                 if datetime.now().timestamp() - last_check >= indicator_time:
                     current_indicator += 1
                     last_check = datetime.now().timestamp()
             current_indicator = current_indicator % len(indicator)
 
+            # Update status display
             with Stats.lock:
+                # If verbose, only show the summary once finished
                 if Config.verbose and not Stats.is_done:
                     continue
 
@@ -235,6 +263,7 @@ class CDManPlugin(BeetsPlugin):
                 p.print_line(8, f"Folders deleted: {Stats.folders_deleted}")
                 p.print_line(9, f"Folders moved: {Stats.folders_moved}")
 
+                # Show loading indicator when not verbose
                 if not Config.verbose:
                     if Stats.is_calculating:
                         msg = f"Checking CD sizes{indicator[current_indicator]}"

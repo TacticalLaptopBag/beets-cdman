@@ -4,6 +4,10 @@ from beetsplug.cd.mp3.mp3_track import MP3Track
 
 
 class MP3Folder:
+    """
+    Representation of a folder in an MP3 CD.
+    """
+
     def __init__(self, path: Path, tracks: list[MP3Track]):
         self._path = path
         self._name = path.name
@@ -15,6 +19,9 @@ class MP3Folder:
 
     @property
     def is_root(self):
+        """
+        Determines if this folder is actually for tracks going directly into the CD folder
+        """
         return self._name == "__root__"
 
     @property
@@ -23,6 +30,9 @@ class MP3Folder:
 
     @property
     def name(self):
+        """
+        The name of the folder, without the prefixed numbering
+        """
         return self._name
 
     @property
@@ -30,6 +40,10 @@ class MP3Folder:
         return self._tracks
 
     def numberize(self, folder_number: int, folder_count: int):
+        """
+        Adds numbers to the beginning of the folder so that
+        alphebetically sorting these folders will put them in the correct order.
+        """
         if self._numberized:
             raise RuntimeError(f"Folder at {self._path} is already numberized!")
         

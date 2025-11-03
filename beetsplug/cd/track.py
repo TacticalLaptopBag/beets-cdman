@@ -7,6 +7,10 @@ from beetsplug.util import unnumber_name
 
 
 class CDTrack(ABC):
+    """
+    A track found from a defined CD
+    """
+
     def __init__(self, src_path: Path, dst_directory: Path):
         self._src_path = src_path
         self.dst_directory = dst_directory
@@ -61,12 +65,19 @@ class CDTrack(ABC):
         pass
 
     def set_dst_path(self, track_number: int, track_count: int):
+        """
+        Numbers the track and determines where it will be populated.
+        """
         digit_length = max(2, len(str(track_count)))
         numbered = str(track_number).zfill(digit_length)
         self._dst_path = self.dst_directory / f"{numbered} {self._name}{self._get_dst_extension()}"
         return None
 
     def is_similar(self, other_path: Path) -> bool:
+        """
+        Determines whether this track is similar enough to the provided path
+        to be considered the same.
+        """
         # There can be very small differences if source and dest teeter on the edge of .5
         # A difference of 1 second is likely the same song
         src_duration = round(self.get_duration(self._src_path))
@@ -75,11 +86,17 @@ class CDTrack(ABC):
         return duration_diff <= 1
 
     def get_size(self) -> int:
+        """
+        Gets the size of the track file in bytes
+        """
         if self._dst_path is None:
             raise RuntimeError("set_dst_path must be run before get_size!")
         return self._dst_path.stat().st_size
 
     def get_duration(self, path: Path) -> float:
+        """
+        Gets the length of the track in seconds
+        """
         if not path.exists():
             return 0.0
 
@@ -102,6 +119,9 @@ class CDTrack(ABC):
 
     @abstractmethod
     def __len__(self):
+        """
+        Gets the size of the track as it is measured by its CD.
+        """
         raise RuntimeError("__len__ is not overridden!")
 
     @override

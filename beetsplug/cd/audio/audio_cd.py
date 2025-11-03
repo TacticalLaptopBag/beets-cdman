@@ -23,6 +23,7 @@ class AudioCD(CD):
 
     @CD.max_size.getter
     def max_size(self) -> float:
+        # 80 minutes of audio in seconds
         return 80 * 60
 
     @override

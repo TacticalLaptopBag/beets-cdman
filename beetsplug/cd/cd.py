@@ -32,6 +32,9 @@ def _mv_job(src_path: Path, dst_path: Path):
 
 
 class CDSplit:
+    """
+    A section of a populated CD that fits onto a single physical CD.
+    """
     def __init__(
         self,
         init: CDTrack,
@@ -43,6 +46,10 @@ class CDSplit:
 
 
 class CD(ABC):
+    """
+    A representation of a user-defined CD
+    """
+    
     def __init__(self, path: Path, executor: DimensionalThreadPoolExecutor) -> None:
         super().__init__()
         self._path = path
@@ -62,6 +69,10 @@ class CD(ABC):
         raise RuntimeError("max_size is not overridden!")
 
     def cleanup(self):
+        """
+        Removes tracks that no longer exist in the CD,
+        and renames tracks that have been reordered.
+        """
         self._executor.submit(self._cleanup)
 
     @abstractmethod
@@ -69,16 +80,20 @@ class CD(ABC):
         pass
 
     def _cleanup_path(self, path: Path, tracks: Sequence[CDTrack]):
+        # If the directory doesn't exist, don't bother cleaning it up
         if not path.exists(): return
         for existing_path in path.iterdir():
+            # If not a file, don't bother, it wasn't made by cdman
             if not existing_path.is_file() and not existing_path.is_symlink():
                 continue
             
+            # Skip over all non-audio files
             mime_path = existing_path.resolve() if existing_path.is_symlink() else existing_path
             mimetype = Magic(mime=True).from_file(mime_path)
             if not mimetype.startswith("audio/"):
                 continue
 
+            # Check for existing tracks
             existing_track_name = unnumber_name(existing_path.stem)
             existing_tracks = [track for track in tracks if track.name == existing_track_name]
             if len(existing_tracks) == 0:
@@ -86,6 +101,7 @@ class CD(ABC):
                 self._executor.submit(_rm_job, existing_path)
                 continue
 
+            # Check if this track already exists in this position
             exact_track = next(filter(lambda t: t.dst_path == existing_path, existing_tracks), None)
             if exact_track is not None:
                 # Path remains unchanged
@@ -105,6 +121,10 @@ class CD(ABC):
             self._executor.submit(_rm_job, existing_path)
     
     def populate(self):
+        """
+        Takes the found tracks from the user's library and puts them into CD folders.
+        """
+
         tracks = self.get_tracks()
         for track_chunk in divide(self._executor.max_workers, tracks):
             self._executor.submit(self._populate_chunk, track_chunk)
@@ -124,6 +144,10 @@ class CD(ABC):
         pass
 
     def calculate_splits(self) -> Sequence[CDSplit]:
+        """
+        Determine where the CD must be split to fit onto a physical CD.
+        """
+        
         splits: list[CDSplit] = []
         tracks = self.get_tracks()
         if len(tracks) == 0:
