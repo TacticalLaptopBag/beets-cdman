@@ -48,6 +48,11 @@ def cds(executor) -> list[AudioCD]:
             cd_path / "cd_2",
             [
                 AudioTrack(
+                    music_path / "01 Jul.m4a", # 342.600544
+                    cd_path / "cd_2",
+                    AudioPopulateMode.CONVERT,
+                ),
+                AudioTrack(
                     music_path / "002 Snowfall.mp3", # 248.450612
                     cd_path / "cd_2",
                     AudioPopulateMode.HARD_LINK,
@@ -105,7 +110,10 @@ def test_populate(cds):
 
     for cd in cds:
         for i, track in enumerate(cd._tracks):
-            assert (cd.path / f"0{i+1} {track.name}{track.src_path.suffix}").exists()
+            if track._populate_mode != AudioPopulateMode.CONVERT:
+                assert (cd.path / f"0{i+1} {track.name}{track.src_path.suffix}").exists()
+            else:
+                assert (cd.path / f"0{i+1} {track.name}.flac").exists()
 
 
 def test_get_tracks(cds):
@@ -217,11 +225,11 @@ def test_calculate_splits(cds):
     splits = cd.calculate_splits()
     assert len(splits) == 1
 
-    cd._test_size = 249
+    cd._test_size = 249 + 342
     splits = cd.calculate_splits()
     assert len(splits) == 2
     assert splits[0].start == cd._tracks[0]
-    assert splits[0].end == cd._tracks[0]
-    assert splits[1].start == cd._tracks[1]
-    assert splits[1].end == cd._tracks[1]
+    assert splits[0].end == cd._tracks[1]
+    assert splits[1].start == cd._tracks[2]
+    assert splits[1].end == cd._tracks[2]
     

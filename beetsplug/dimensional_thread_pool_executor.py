@@ -38,6 +38,7 @@ class DimensionalThreadPoolExecutor:
         )
         self._max_workers = max_workers
         self._tasks = Queue[Optional[_Task]]()
+        self._shutdown = False
 
         # Occupy each worker with a task loop
         for _ in range(self._max_workers):
@@ -55,6 +56,9 @@ class DimensionalThreadPoolExecutor:
         self._tasks.join()
 
     def shutdown(self):
+        if self._shutdown:
+            return
+
         self.wait()
 
         # Signal task loops that they're done
@@ -63,6 +67,7 @@ class DimensionalThreadPoolExecutor:
 
         # Cleanup executor
         self._executor.shutdown()
+        self._shutdown = True
 
     def _task_loop(self):
         while True:

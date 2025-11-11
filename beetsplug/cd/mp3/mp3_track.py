@@ -6,6 +6,7 @@ from typing import override
 from beetsplug.stats import Stats
 from beetsplug.config import Config
 from beetsplug.cd.track import CDTrack
+from beetsplug.util import ffmpeg
 
 
 class MP3Track(CDTrack):
@@ -48,33 +49,15 @@ class MP3Track(CDTrack):
         
         # Convert to MP3 using ffmpeg
         # ffmpeg -i "$source_file" -hide_banner -loglevel error -acodec libmp3lame -ar 44100 -b:a ${bitrate}k -vn "$output_file"
-        result = subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i", str(self._src_path),
-                "-hide_banner",
-                "-acodec", "libmp3lame",
-                "-ar", "44100",
-                "-b:a", f"{self._bitrate}k",
-                "-vn", str(self._dst_path)
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        result = ffmpeg(self._src_path, self._dst_path, [
+            "-acodec", "libmp3lame",
+            "-ar", "44100",
+            "-b:a", f"{self._bitrate}k",
+            "-vn",
+        ])
 
         # Check that the conversion actually went through
         if result.returncode != 0:
-            if Config.verbose:
-                sys.stderr.write(f"Error converting `{self._src_path}`! Look in `{self.dst_directory}` for ffmpeg logs.\n")
-
-            # Create error logs in place of where the track should've been
-            stdout_log_path = self._dst_path.with_suffix(".stdout.log")
-            stderr_log_path = self._dst_path.with_suffix(".stderr.log")
-            with stdout_log_path.open("wb") as stdout_log:
-                stdout_log.write(result.stdout)
-            with stderr_log_path.open("wb") as stderr_log:
-                stderr_log.write(result.stderr)
             Stats.fail_track()
         else:
             Stats.populate_track()

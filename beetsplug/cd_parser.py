@@ -80,8 +80,10 @@ class CDParser:
             # Parse CD data found in the definition file
             view = RootView([YamlSource(str(path))])
             return self._parse_data(view)
-        except:
+        except BaseException as e:
             print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
+            print(e)
+            print()
             return []
 
     def _parse_data(self, view: ConfigView) -> list[CD]:
@@ -102,11 +104,15 @@ class CDParser:
                 raise ValueError(f"Invalid type for CD '{cd_name}'. Must be either 'mp3' or 'audio'.\n")
         return cds
 
+    def _get_cd_path(self, view: Subview) -> Path:
+        name: str = view["name"].get(str) if "name" in view else view.key # type: ignore
+        return Path(view["path"].get(str)) / name if "path" in view else self.cds_path / name # type: ignore
+
     def _parse_mp3_data(self, view: Subview) -> CD:
         """
         Loads an MP3 CD from a CD definition view
         """
-        cd_path = self.cds_path / view.key
+        cd_path: Path = self._get_cd_path(view)
 
         # Determine bitrate
         bitrate: int = 0
@@ -150,7 +156,7 @@ class CDParser:
         """
         Loads an Audio CD from a CD definition view
         """
-        cd_path = self.cds_path / view.key
+        cd_path = self._get_cd_path(view)
 
         # Determine the populate mode for this CD
         populate_mode = AudioPopulateMode.COPY

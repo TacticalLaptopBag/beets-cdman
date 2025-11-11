@@ -8,6 +8,7 @@ from beetsplug.stats import Stats
 from beetsplug.config import Config
 from beetsplug.cd.track import CDTrack
 from beetsplug.cd.audio.audio_populate_mode import AudioPopulateMode
+from beetsplug.util import ffmpeg
 
 
 class AudioTrack(CDTrack):
@@ -35,7 +36,8 @@ class AudioTrack(CDTrack):
             is_hard_link = self._dst_path.stat().st_nlink > 1
             skip = (self._populate_mode == AudioPopulateMode.SOFT_LINK and self._dst_path.is_symlink())
             skip = skip or (self._populate_mode == AudioPopulateMode.HARD_LINK and is_hard_link)
-            skip = skip or (self._populate_mode == AudioPopulateMode.COPY and self._dst_path.is_file() and not is_hard_link)
+            skip = skip or (self._populate_mode == AudioPopulateMode.COPY and self._dst_path.is_file() and not is_hard_link and self._dst_path.stat().st_size == self._src_path.stat().st_size)
+            skip = skip or (self._populate_mode == AudioPopulateMode.CONVERT and self._dst_path.is_file() and not is_hard_link and self._dst_path.stat().st_size != self._src_path.stat().st_size)
             if skip:
                 # Track is in the same mode, we can safely skip this
                 Stats.skip_track()
@@ -73,6 +75,16 @@ class AudioTrack(CDTrack):
                         print(verbose_format.format("Copy"))
                     if not Config.dry:
                         shutil.copy2(self._src_path, self._dst_path)
+                case AudioPopulateMode.CONVERT:
+                    if Config.verbose:
+                        print(verbose_format.format("Converting"))
+                    if not Config.dry:
+                        result = ffmpeg(
+                            self._src_path,
+                            self._dst_path.with_suffix(".flac"),
+                            ["-vn"]
+                        )
+                        result.check_returncode()
                 case _:
                     Stats.fail_track()
                     raise ValueError("Invalid populate_mode")

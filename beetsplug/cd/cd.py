@@ -140,6 +140,10 @@ class CD(ABC):
         pass
 
     @abstractmethod
+    def is_empty(self) -> bool:
+        pass
+
+    @abstractmethod
     def numberize(self):
         pass
 
