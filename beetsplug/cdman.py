@@ -28,10 +28,6 @@ class CDManPlugin(BeetsPlugin):
             "bitrate": 192,
             "threads": hw_thread_count,
         })
-        self._summary_thread = Thread(
-            target=self._summary_thread_function,
-            name="Summary",
-        )
         return None
 
     @override
@@ -83,6 +79,16 @@ class CDManPlugin(BeetsPlugin):
                 "This overrides --list-unused.",
             action="store_true",
         )
+        cmd.parser.add_option(
+            "--skip-cleanup",
+            help="Skips checking for tracks that have been moved or deleted.",
+            action="store_true",
+        )
+        cmd.parser.add_option(
+            "--list-empty", "-e",
+            help="Lists any empty CD definitions in the found CDs.",
+            action="store_true",
+        )
 
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
@@ -122,7 +128,7 @@ class CDManPlugin(BeetsPlugin):
                     continue
                 arg_cds = cd_parser.from_path(arg_path)
                 cds.extend(arg_cds)
-
+        
         # Check if there's even any CDs to work with
         if len(cds) == 0:
             print("No CD definitions found!")
@@ -138,11 +144,17 @@ class CDManPlugin(BeetsPlugin):
             return None
 
         # Determine which subcommand is run
+        run_populate = True
         if opts.list_unused or opts.list_unused_paths:
             self._list_unused(lib, opts, cds)
-        else:
-            self._populate(cds)
-        
+            run_populate = False
+        if opts.list_empty:
+            self._list_empty_cds(cds)
+            run_populate = False
+
+        if run_populate:
+            self._populate(cds, opts.skip_cleanup)
+
         return None
 
     def _list_unused(self, lib: Library, opts: Values, cds: list[CD]):
@@ -166,7 +178,7 @@ class CDManPlugin(BeetsPlugin):
                     print(f"{item.get("artist")} - {item.get("album")} - {item.get("title")}")
         return None
 
-    def _populate(self, cds: list[CD]):
+    def _populate(self, cds: list[CD], skip_cleanup: bool):
         """
         Populates all CDs with their defined tracks
         """
@@ -196,7 +208,8 @@ class CDManPlugin(BeetsPlugin):
             # Populate CDs
             for cd in cds:
                 cd.numberize()
-                cd.cleanup()
+                if not skip_cleanup:
+                    cd.cleanup()
                 cd.populate()
 
             # Wait for all populates to finish before calculating splits
@@ -222,7 +235,22 @@ class CDManPlugin(BeetsPlugin):
                         path_start = f"{split.start.dst_path.parent.name}{os.path.sep}{path_start}"
                         path_end = f"{split.end.dst_path.parent.name}{os.path.sep}{path_end}"
                     print(f"\t({i+1}/{len(splits)}): {path_start} -- {path_end}")
+
+        print()
+        self._list_empty_cds(cds, report_none=False)
+        
         return None
+
+    def _list_empty_cds(self, cds: list[CD], *, report_none: bool = True):
+        empty_cds: list[CD] = list(cd for cd in cds if cd.is_empty())
+        if len(empty_cds) > 0:
+            print("These CDs contain no tracks! Check your definitions for these CDs:")
+            for empty_cd in empty_cds:
+                print(f"\t{empty_cd.path.name} ({empty_cd.pretty_type})")
+        elif report_none:
+            print("No empty CD definitions found.")
+        self._executor.shutdown()
+        
 
     def _summary_thread_function(self, track_count: int):
         """

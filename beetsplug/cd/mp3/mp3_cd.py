@@ -94,6 +94,17 @@ class MP3CD(CD):
         return [track for folder in self._folders for track in folder.tracks]
 
     @override
+    def is_empty(self) -> bool:
+        if len(self._folders) == 0:
+            return True
+        
+        for folder in self._folders:
+            if len(folder.tracks) == 0:
+                return True
+        
+        return False
+
+    @override
     def numberize(self):
         folder_count = len(self._folders)
         folder_number = 1

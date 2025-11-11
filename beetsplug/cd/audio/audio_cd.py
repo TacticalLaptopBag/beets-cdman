@@ -35,6 +35,10 @@ class AudioCD(CD):
         return self._tracks
 
     @override
+    def is_empty(self) -> bool:
+        return len(self._tracks) == 0
+
+    @override
     def numberize(self):
         track_count = len(self._tracks)
         for i, track in enumerate(self._tracks):
