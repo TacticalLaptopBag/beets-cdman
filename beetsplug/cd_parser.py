@@ -80,8 +80,10 @@ class CDParser:
             # Parse CD data found in the definition file
             view = RootView([YamlSource(str(path))])
             return self._parse_data(view)
-        except:
+        except BaseException as e:
             print(f"Error while loading from file `{path}` - is this a valid cdman definition file?")
+            print(e)
+            print()
             return []
 
     def _parse_data(self, view: ConfigView) -> list[CD]:
