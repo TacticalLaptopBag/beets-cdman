@@ -203,7 +203,8 @@ class CDParser:
         Finds track paths from a beets query
         """
         parsed_query, _ = parse_query_string(query, Item)
-        items = self.lib.items(parsed_query)
+        items = list(item for item in self.lib.items(parsed_query))
+        items.sort(key=lambda i: int(i.get("track") if "track" in i.keys() else 0))
         return [item.filepath for item in items]
 
     def _get_tracks_from_playlist(self, playlist_path: Path) -> list[Path]:
