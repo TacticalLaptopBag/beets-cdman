@@ -170,7 +170,18 @@ class CDManPlugin(BeetsPlugin):
         """
         Populates all CDs with their defined tracks
         """
+        track_count = 0
+        for cd in cds:
+            track_count += len(cd.get_tracks())
+
         # Show the current status to the user
+        self._summary_thread = Thread(
+            target=self._summary_thread_function,
+            kwargs={
+                "track_count": track_count,
+            },
+            name="Summary",
+        )
         self._summary_thread.start()
 
         # Prepare splits
@@ -213,7 +224,7 @@ class CDManPlugin(BeetsPlugin):
                     print(f"\t({i+1}/{len(splits)}): {path_start} -- {path_end}")
         return None
 
-    def _summary_thread_function(self):
+    def _summary_thread_function(self, track_count: int):
         """
         Shows the user the current state of populating
         """
@@ -272,7 +283,9 @@ class CDManPlugin(BeetsPlugin):
                             msg = f"Tracks populating: {Stats.tracks_populating} {indicator[current_indicator] * Stats.tracks_populating}"
                         else:
                             msg = f"Searching for tracks{indicator[current_indicator]}"
-                    p.print_line(11, msg)
+                    progress = (Stats.tracks_failed + Stats.tracks_populated + Stats.tracks_skipped) / track_count
+                    p.print_line(11, f"Progress: {progress:.1%}")
+                    p.print_line(12, msg)
 
                 if Stats.is_done:
                     break
