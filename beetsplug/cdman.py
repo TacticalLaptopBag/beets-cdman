@@ -74,7 +74,7 @@ class CDManPlugin(BeetsPlugin):
         )
         cmd.parser.add_option(
             "--list-unused", "-l",
-            help="Lists tracks in your beets library that are not found in any of your CDs",
+            help="Lists tracks in your beets library that are not found in any of your CDs.",
             action="store_true",
         )
         cmd.parser.add_option(
