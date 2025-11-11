@@ -292,7 +292,8 @@ class CDManPlugin(BeetsPlugin):
                 if Config.verbose and not Stats.is_done:
                     continue
 
-                p.print_line(1, f"Found CDs: {Stats.cds}")
+                s = "s" if Stats.cds != 1 else ""
+                p.print_line(1, f"Found {Stats.cds} CD{s}")
 
                 p.print_line(3, f"Tracks populated: {Stats.tracks_populated}")
                 p.print_line(4, f"Tracks skipped: {Stats.tracks_skipped}")

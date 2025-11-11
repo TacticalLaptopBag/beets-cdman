@@ -13,16 +13,14 @@ class Stats:
     tracks_failed = 0
     folders_deleted = 0
     folders_moved = 0
-    cds = ""
+    cds = 0
     is_done = False
     is_calculating = False
 
     @classmethod
     def found_cd(cls, cd_name: str, cd_type: str):
         with cls.lock:
-            if len(cls.cds) > 0:
-                cls.cds += ", "
-            cls.cds += f"{cd_name} ({cd_type})"
+            cls.cds += 1
         cls._notify()
 
     @classmethod
