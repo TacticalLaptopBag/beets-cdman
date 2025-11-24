@@ -186,7 +186,7 @@ def test_cleanup_with_duplicates(dup_cd):
         assert Stats.tracks_deleted == 0
 
 
-def test_calculate_splits(cds):
+def test_get_splits(cds):
     with cds[0]._executor:
         cds[0].numberize()
         cds[0].populate()
@@ -196,7 +196,7 @@ def test_calculate_splits(cds):
     cd = cds[0]
 
     cd._test_size = 208 + 278
-    splits = cd.calculate_splits()
+    splits = cd.get_splits()
     assert len(splits) == 2
     assert splits[0].start == cd._tracks[0]
     assert splits[0].end == cd._tracks[1]
@@ -204,13 +204,13 @@ def test_calculate_splits(cds):
     assert splits[1].end == cd._tracks[2]
 
     cd._test_size = -1
-    splits = cd.calculate_splits()
+    splits = cd.get_splits()
     assert len(splits) == 1
     assert splits[0].start == cd._tracks[0]
     assert splits[0].end == cd._tracks[2]
 
     cd._test_size = 208
-    splits = cd.calculate_splits()
+    splits = cd.get_splits()
     assert len(splits) == 3
     assert splits[0].start == cd._tracks[0]
     assert splits[0].end == cd._tracks[0]
@@ -222,14 +222,39 @@ def test_calculate_splits(cds):
     cd = cds[1]
 
     cd._test_size = 249 + 343
-    splits = cd.calculate_splits()
+    splits = cd.get_splits()
     assert len(splits) == 1
 
     cd._test_size = 249 + 342
-    splits = cd.calculate_splits()
+    splits = cd.get_splits()
     assert len(splits) == 2
     assert splits[0].start == cd._tracks[0]
     assert splits[0].end == cd._tracks[1]
     assert splits[1].start == cd._tracks[2]
     assert splits[1].end == cd._tracks[2]
     
+
+def test_get_tracklist(cds):
+    with cds[0]._executor:
+        for cd in cds:
+            cd.numberize()
+            cd.populate()
+            
+        cd = cds[0]
+        cd._executor.wait()
+        tracklist = cd.get_tracklist()
+        assert len(tracklist) == 1
+        assert len(tracklist[0]) == 3
+        assert tracklist[0][0] == "01 Jul"
+        assert tracklist[0][1] == "02 Stars In Her Skies"
+        assert tracklist[0][2] == "03 Chasing Daylight"
+
+        cd = cds[1]
+        cd._test_size = 400
+        tracklist = cd.get_tracklist()
+        assert len(tracklist) == 2
+        assert len(tracklist[0]) == 2
+        assert len(tracklist[1]) == 1
+        assert tracklist[0][0] == "01 Jul"
+        assert tracklist[0][1] == "02 Snowfall"
+        assert tracklist[1][0] == "03 A Kind Of Hope"
