@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 from typing import override
 
@@ -43,3 +44,23 @@ class AudioCD(CD):
         track_count = len(self._tracks)
         for i, track in enumerate(self._tracks):
             track.set_dst_path(i+1, track_count)
+
+    @override
+    def get_tracklist(self) -> Sequence[Sequence[str]]:
+        splits = self.get_splits()
+        tracklist: list[list[str]] = []
+        disc_tracklist: list[str] = []
+
+        current_split_idx = 0
+        for track in self._tracks:
+            split = splits[current_split_idx]
+            disc_tracklist.append(f"{track.number} {track.name}")
+            if track == split.end:
+                tracklist.append(disc_tracklist)
+                disc_tracklist = []
+                current_split_idx += 1
+
+        if len(disc_tracklist) > 0:
+            tracklist.append(disc_tracklist)
+            
+        return tracklist

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 import os
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 from magic import Magic
 from more_itertools import divide
 
@@ -44,6 +44,9 @@ class CDSplit:
         self.end = init
         self.size = size
 
+    def __str__(self):
+        return f"{self.start.name} -- {self.end.name} ({self.size})"
+
 
 class CD(ABC):
     """
@@ -55,6 +58,7 @@ class CD(ABC):
         self._path = path
         self._executor = executor
         self._test_size = -1
+        self._splits: Optional[Sequence[CDSplit]] = None
 
     @property
     def pretty_type(self) -> str:
@@ -147,10 +151,16 @@ class CD(ABC):
     def numberize(self):
         pass
 
-    def calculate_splits(self) -> Sequence[CDSplit]:
+    @abstractmethod
+    def get_tracklist(self) -> Sequence[Sequence[str]]:
+        pass
+
+    def get_splits(self) -> Sequence[CDSplit]:
         """
         Determine where the CD must be split to fit onto a physical CD.
         """
+        if self._splits is not None and self._test_size < 0:
+            return self._splits
         
         splits: list[CDSplit] = []
         tracks = self.get_tracks()
@@ -172,4 +182,5 @@ class CD(ABC):
             next_split.end = track
         
         splits.append(next_split)
+        self._splits = splits
         return splits

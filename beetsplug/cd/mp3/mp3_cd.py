@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 import shutil
 from typing import override
@@ -51,7 +52,8 @@ class MP3CD(CD):
     @override
     def _cleanup(self):
         # If the CD doesn't exist yet, there's nothing to cleanup
-        if not self._path.exists(): return
+        if not self._path.exists():
+            return
 
         for existing_path in self._path.iterdir():
             # MP3 CDs are defined with folders first
@@ -69,7 +71,7 @@ class MP3CD(CD):
             
             # Confirm that the folders have been numberized
             for existing_folder in existing_folders:
-                assert existing_folder._numberized
+                assert existing_folder._number is not None
 
             # Check if this exact folder exists in its current position
             exact_folder = next(filter(lambda f: f.path == existing_path, existing_folders), None)
@@ -113,3 +115,28 @@ class MP3CD(CD):
             # If this is a root folder, it shouldn't affect the other folders' numbering
             if not folder.is_root:
                 folder_number += 1
+
+    @override
+    def get_tracklist(self) -> Sequence[Sequence[str]]:
+        splits = self.get_splits()
+        tracklist: list[list[str]] = []
+        disc_tracklist: list[str] = []
+        
+        current_split_idx = 0
+        for folder in self._folders:
+            split = splits[current_split_idx]
+            folder_entry = f"{folder.number} {folder.name}" if not folder.is_root else "[Root]"
+            disc_tracklist.append(folder_entry)
+            for i, track in enumerate(folder.tracks):
+                if track == split.end:
+                    tracklist.append(disc_tracklist)
+                    disc_tracklist = []
+                    if i != len(folder.tracks) - 1:
+                        disc_tracklist.append(folder_entry)
+                    current_split_idx += 1
+                    break
+
+        if len(disc_tracklist) > 0:
+            tracklist.append(disc_tracklist)
+            
+        return tracklist

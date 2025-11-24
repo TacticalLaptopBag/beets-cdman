@@ -15,6 +15,7 @@ class CDTrack(ABC):
         self._src_path = src_path
         self.dst_directory = dst_directory
         self._dst_path: Optional[Path] = None
+        self._number: Optional[str] = None
         self._name = unnumber_name(src_path.stem)
         self.__src_stream: Optional[Any] = None
         self.__dst_stream: Optional[Any] = None
@@ -24,6 +25,12 @@ class CDTrack(ABC):
         if self._dst_path is None:
             raise RuntimeError("Attempt to access dst_path before it has been set")
         return self._dst_path
+
+    @property
+    def number(self) -> str:
+        if self._number is None:
+            raise RuntimeError("Attempt to access number before it has been set")
+        return self._number
 
     @property
     def src_path(self) -> Path:
@@ -69,8 +76,8 @@ class CDTrack(ABC):
         Numbers the track and determines where it will be populated.
         """
         digit_length = max(2, len(str(track_count)))
-        numbered = str(track_number).zfill(digit_length)
-        self._dst_path = self.dst_directory / f"{numbered} {self._name}{self._get_dst_extension()}"
+        self._number = str(track_number).zfill(digit_length)
+        self._dst_path = self.dst_directory / f"{self._number} {self._name}{self._get_dst_extension()}"
         return None
 
     def is_similar(self, other_path: Path) -> bool:

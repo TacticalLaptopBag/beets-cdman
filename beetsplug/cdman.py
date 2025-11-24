@@ -200,7 +200,7 @@ class CDManPlugin(BeetsPlugin):
         cd_splits: dict[CD, Sequence[CDSplit]] = {}
         cd_splits_lock = Lock()
         def split_job(cd: CD):
-            splits = cd.calculate_splits()
+            splits = cd.get_splits()
             with cd_splits_lock:
                 cd_splits[cd] = splits
 
