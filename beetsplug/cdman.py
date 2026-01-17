@@ -14,6 +14,7 @@ from beetsplug.cd.cd import CD, CDSplit
 from beetsplug.cd_parser import CDParser
 from beetsplug.config import Config
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.document.document_builder import DocumentBuilder
 from beetsplug.printer import Printer
 from beetsplug.stats import Stats
 
@@ -89,6 +90,11 @@ class CDManPlugin(BeetsPlugin):
             help="Lists any empty CD definitions in the found CDs.",
             action="store_true",
         )
+        cmd.parser.add_option(
+            "--create-doc",
+            help="Creates a Microsoft Word document with a list of all the tracks/folders in the found CDs.",
+            action="store_true",
+        )
 
         def cdman_cmd(lib: Library, opts: Values, args: list[str]):
             self._cmd(lib, opts, args)
@@ -154,6 +160,8 @@ class CDManPlugin(BeetsPlugin):
 
         if run_populate:
             self._populate(cds, opts.skip_cleanup)
+            if opts.create_doc:
+                DocumentBuilder(cds).create_document(Path(f"cdman-tracklist_{datetime.now().strftime("%Y-%m-%dT%H:%M:%S")}.docx"))
 
         return None
 
