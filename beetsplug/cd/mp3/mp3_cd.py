@@ -126,13 +126,19 @@ class MP3CD(CD):
         for folder in self._folders:
             split = splits[current_split_idx]
             folder_entry = f"{folder.number} {folder.name}" if not folder.is_root else "[Root]"
-            disc_tracklist.append(folder_entry)
+            if folder.is_root:
+                disc_tracklist.insert(0, folder_entry)
+            else:
+                disc_tracklist.append(folder_entry)
             for i, track in enumerate(folder.tracks):
                 if track == split.end:
                     tracklist.append(disc_tracklist)
                     disc_tracklist = []
                     if i != len(folder.tracks) - 1:
-                        disc_tracklist.append(folder_entry)
+                        if folder.is_root:
+                            disc_tracklist.insert(0, folder_entry)
+                        else:
+                            disc_tracklist.append(folder_entry)
                     current_split_idx += 1
                     break
 

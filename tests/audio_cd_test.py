@@ -6,6 +6,7 @@ from beetsplug.cd.audio.audio_cd import AudioCD
 from beetsplug.cd.audio.audio_populate_mode import AudioPopulateMode
 from beetsplug.cd.audio.audio_track import AudioTrack
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.document.document_builder import DocumentBuilder
 from beetsplug.stats import Stats
 
 from tests import common
@@ -263,3 +264,12 @@ def test_get_tracklist(cds):
         assert tracklist[0][0] == "01 Jul"
         assert tracklist[0][1] == "02 Snowfall"
         assert tracklist[1][0] == "03 A Kind Of Hope"
+
+
+def test_create_document(cds):
+    with cds[0]._executor:
+        for cd in cds:
+            cd.numberize()
+            cd.populate()
+        cds[0]._executor.wait()
+        DocumentBuilder(cds * 10).create_document(Path(__file__).parent / "audio-doc.docx")

@@ -6,6 +6,7 @@ from beetsplug.cd.mp3.mp3_cd import MP3CD
 from beetsplug.cd.mp3.mp3_folder import MP3Folder
 from beetsplug.cd.mp3.mp3_track import MP3Track
 from beetsplug.dimensional_thread_pool_executor import DimensionalThreadPoolExecutor
+from beetsplug.document.document_builder import DocumentBuilder
 from beetsplug.stats import Stats
 
 from tests import common
@@ -334,3 +335,12 @@ def test_get_tracklist(cds):
         assert tracklist[0][0] == "01 Songs that start with S"
         assert tracklist[1][0] == "01 Songs that start with S"
         assert tracklist[1][1] == "02 Jul and Horizons"
+
+
+def test_create_document(cds):
+    with cds[0]._executor:
+        for cd in cds:
+            cd.numberize()
+            cd.populate()
+        cds[0]._executor.wait()
+        DocumentBuilder(cds * 10).create_document(Path(__file__).parent / "mp3-doc.docx")
