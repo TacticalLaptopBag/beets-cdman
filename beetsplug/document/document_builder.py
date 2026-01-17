@@ -23,7 +23,7 @@ class DocumentBuilder:
                 text_data.append(TextData("  • " + track, bold=False))
         return text_data
 
-    def format_paragraph(self, paragraph: Paragraph):
+    def _format_paragraph(self, paragraph: Paragraph):
         format = paragraph.paragraph_format
         format.space_before = Pt(0)
         format.space_after = Pt(0)
@@ -57,12 +57,12 @@ class DocumentBuilder:
             text_data = self._get_text(cd)
             for data in text_data:
                 paragraph = doc.add_paragraph(data.text)
-                self.format_paragraph(paragraph)
+                self._format_paragraph(paragraph)
                 for run in paragraph.runs:
                     run.font.size = Pt(11)
                     run.bold = data.bold
             final_paragraph = doc.add_paragraph()
-            self.format_paragraph(final_paragraph)
+            self._format_paragraph(final_paragraph)
 
         doc.save(str(path))
 
