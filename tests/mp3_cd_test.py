@@ -280,6 +280,7 @@ def test_get_splits(cds):
     
     # Split right at folder
     cd._test_size = 4437541 + 3976559
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 2
     assert splits[0].start == tracks[0]
@@ -289,6 +290,7 @@ def test_get_splits(cds):
 
     # Split in between folders
     cd._test_size = 4695280
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 4
     assert splits[0].start == tracks[0]
@@ -325,13 +327,10 @@ def test_get_tracklist(cds):
 
         cd = cds[0]
         cd._test_size = 8250000
-        for split in cd.get_splits():
-            print(split)
         tracklist = cd.get_tracklist()
-        assert len(tracklist) == 3
+        assert len(tracklist) == 2
         assert len(tracklist[0]) == 1
-        assert len(tracklist[1]) == 1
-        assert len(tracklist[2]) == 1
+        assert len(tracklist[1]) == 2
         assert tracklist[0][0] == "01 Songs that start with S"
         assert tracklist[1][0] == "01 Songs that start with S"
-        assert tracklist[2][0] == "02 Jul and Horizons"
+        assert tracklist[1][1] == "02 Jul and Horizons"

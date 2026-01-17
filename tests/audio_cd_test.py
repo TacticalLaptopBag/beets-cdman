@@ -196,6 +196,7 @@ def test_get_splits(cds):
     cd = cds[0]
 
     cd._test_size = 208 + 278
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 2
     assert splits[0].start == cd._tracks[0]
@@ -204,12 +205,14 @@ def test_get_splits(cds):
     assert splits[1].end == cd._tracks[2]
 
     cd._test_size = -1
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 1
     assert splits[0].start == cd._tracks[0]
     assert splits[0].end == cd._tracks[2]
 
     cd._test_size = 208
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 3
     assert splits[0].start == cd._tracks[0]
@@ -222,10 +225,12 @@ def test_get_splits(cds):
     cd = cds[1]
 
     cd._test_size = 249 + 343
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 1
 
     cd._test_size = 249 + 342
+    cd._splits = None
     splits = cd.get_splits()
     assert len(splits) == 2
     assert splits[0].start == cd._tracks[0]
